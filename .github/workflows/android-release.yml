@@ -1,0 +1,135 @@
+name: Android Signed Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-signed-release
+  cancel-in-progress: false
+
+jobs:
+  signed-release:
+    if: github.ref == 'refs/heads/foundation/vpn-ai-start'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools"
+
+      - name: Install Android SDK components
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Decode and validate signing keystore
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/vpn-ai-release-signing.jks
+        run: |
+          set -euo pipefail
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Required signing secret is missing: $name"
+              exit 1
+            fi
+          done
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_FILE"
+          test -s "$ANDROID_KEYSTORE_FILE"
+          chmod 600 "$ANDROID_KEYSTORE_FILE"
+          keytool -list -v \
+            -keystore "$ANDROID_KEYSTORE_FILE" \
+            -storepass:env ANDROID_KEYSTORE_PASSWORD \
+            -alias "$ANDROID_KEY_ALIAS" | tee "$RUNNER_TEMP/keystore-certificate.txt"
+          echo "ANDROID_KEYSTORE_FILE=$ANDROID_KEYSTORE_FILE" >> "$GITHUB_ENV"
+
+      - name: Build signed release APK
+        env:
+          ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/vpn-ai-release-signing.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: gradle --no-daemon :app:assembleRelease
+
+      - name: Verify APK signature, certificate, validity and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$APKSIGNER"
+          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee app/build/outputs/apk/release/APK-CERTIFICATE.txt
+          grep -E "Signer #1 certificate SHA-256 digest:" app/build/outputs/apk/release/APK-CERTIFICATE.txt
+          sha256sum "$APK" | tee app/build/outputs/apk/release/SHA256SUMS.txt
+
+      - name: Compare certificate with previous published APK when available
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/release/app-release.apk"
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          mkdir -p "$RUNNER_TEMP/previous-release"
+          TAG="$(gh release list --limit 1 --json tagName --jq '.[0].tagName // empty')"
+          if [[ -z "$TAG" ]]; then
+            echo "No previous published GitHub release exists; certificate continuity comparison is not applicable."
+            echo "No previous release APK found." > app/build/outputs/apk/release/PREVIOUS-CERTIFICATE-COMPARISON.txt
+          else
+            if gh release download "$TAG" --pattern '*.apk' --dir "$RUNNER_TEMP/previous-release"; then
+              PREVIOUS_APK="$(find "$RUNNER_TEMP/previous-release" -type f -name '*.apk' | head -n 1)"
+              if [[ -n "$PREVIOUS_APK" ]]; then
+                "$APKSIGNER" verify --print-certs "$PREVIOUS_APK" > "$RUNNER_TEMP/previous-cert.txt"
+                "$APKSIGNER" verify --print-certs "$APK" > "$RUNNER_TEMP/current-cert.txt"
+                PREVIOUS_FP="$(sed -n 's/.*Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/previous-cert.txt" | head -n 1)"
+                CURRENT_FP="$(sed -n 's/.*Signer #1 certificate SHA-256 digest: //p' "$RUNNER_TEMP/current-cert.txt" | head -n 1)"
+                test -n "$PREVIOUS_FP" && test -n "$CURRENT_FP"
+                {
+                  echo "Previous release tag: $TAG"
+                  echo "Previous APK certificate SHA-256: $PREVIOUS_FP"
+                  echo "Current APK certificate SHA-256: $CURRENT_FP"
+                } | tee app/build/outputs/apk/release/PREVIOUS-CERTIFICATE-COMPARISON.txt
+                if [[ "$PREVIOUS_FP" != "$CURRENT_FP" ]]; then
+                  echo "::error::Signing certificate does not match the previous published APK."
+                  exit 1
+                fi
+              else
+                echo "Previous release $TAG has no APK asset; certificate continuity comparison unavailable." | tee app/build/outputs/apk/release/PREVIOUS-CERTIFICATE-COMPARISON.txt
+              fi
+            else
+              echo "Previous release $TAG has no downloadable APK asset; certificate continuity comparison unavailable." | tee app/build/outputs/apk/release/PREVIOUS-CERTIFICATE-COMPARISON.txt
+            fi
+          fi
+
+      - name: Upload signed release APK and verification records
+        uses: actions/upload-artifact@v4
+        with:
+          name: vpn-ai-0.1.0-release
+          path: |
+            app/build/outputs/apk/release/app-release.apk
+            app/build/outputs/apk/release/SHA256SUMS.txt
+            app/build/outputs/apk/release/APK-CERTIFICATE.txt
+            app/build/outputs/apk/release/PREVIOUS-CERTIFICATE-COMPARISON.txt
+          if-no-files-found: error
+          retention-days: 90
