@@ -72,7 +72,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b clean-import/2026-11
-          rsync -a --delete --exclude='.git' --exclude='.github/workflows/import-clean-snapshot.yml' ../source/ ./
+          rsync -a --delete --exclude='.git' --exclude='.github/workflows/import-clean-snapshot.yml' --exclude='.github/workflows/cleanup-pre5-releases.yml' ../source/ ./
           mkdir -p docs
           cat > docs/MIGRATION_PROVENANCE.md <<'EOF'
           # Clean source snapshot provenance
