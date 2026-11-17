@@ -29,7 +29,10 @@ AI may optimize decisions; deterministic lifecycle and security controls remain 
 - The updater downloads a newer APK only when a SHA-256 digest is available from GitHub release-asset metadata and verifies the downloaded bytes before presenting the installer.
 - Android Package Manager validates signing-certificate continuity during installation. A different signing certificate cannot update an existing installation with the same application ID.
 - Ordinary Android apps cannot silently install APK updates. Android requires the user to grant per-app install permission where applicable and approve each package installation in the system installer.
-- A persistent private signing key must be held in an external protected secret store and made available only to the authorized release workflow. It must never be committed to the repository or embedded in the APK.
+- One persistent Android signing keystore and alias must be reused for every release; generating a replacement keystore is forbidden.
+- The release workflow requires the protected GitHub Actions secrets ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD, plus the non-secret repository Actions variable ANDROID_SIGNING_CERT_SHA256 containing the pinned certificate SHA-256 fingerprint.
+- Every release is rejected unless the keystore certificate matches that pinned fingerprint. After the first release, the workflow also compares the new APK certificate with the previous published APK and rejects any mismatch.
+- The private keystore must never be committed to the repository, published as an artifact, or embedded in the APK.
 
 ## Engineering and release rules
 
