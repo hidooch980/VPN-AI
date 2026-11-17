@@ -11,6 +11,12 @@ CREDENTIALS="$WORK_DIR/signing-credentials.txt"
 ARCHIVE="$WORK_DIR/signing-backup.tar.gz"
 BACKUP="$HOME/vpn-ai-release-keystore.jks.enc"
 
+# Termux Android 17 may abort with OpenJDK 21 keytool; prefer the verified OpenJDK 25 package.
+if [[ -n "${PREFIX:-}" && -x "$PREFIX/lib/jvm/java-25-openjdk/bin/keytool" ]]; then
+  export JAVA_HOME="$PREFIX/lib/jvm/java-25-openjdk"
+  export PATH="$JAVA_HOME/bin:$PATH"
+fi
+
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 for cmd in gh keytool openssl base64 git tar; do command -v "$cmd" >/dev/null 2>&1 || fail "Required command not found: $cmd"; done
 [[ -d .git ]] || fail "Run this script from the root of a cloned VPN-AI repository."
