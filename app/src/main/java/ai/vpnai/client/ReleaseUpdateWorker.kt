@@ -33,8 +33,11 @@ class ReleaseUpdateWorker(
             val release = getJson(RELEASE_API)
             val tag = release.optString("tag_name")
             val assets = release.optJSONArray("assets") ?: return@withContext Result.success()
-            val currentCode = applicationContext.packageManager
-                .getPackageInfo(applicationContext.packageName, 0).longVersionCode
+            val packageInfo = applicationContext.packageManager
+                .getPackageInfo(applicationContext.packageName, 0)
+            @Suppress("DEPRECATION")
+            val currentCode = if (Build.VERSION.SDK_INT >= 28) packageInfo.longVersionCode
+                else packageInfo.versionCode.toLong()
             var selectedUrl: String? = null
             var expectedDigest: String? = null
             for (i in 0 until assets.length()) {
