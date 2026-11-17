@@ -1,6 +1,8 @@
 name: Android Signed Release
 
 on:
+  push:
+    branches: ["foundation/vpn-ai-start"]
   workflow_dispatch:
 
 permissions:
@@ -61,6 +63,17 @@ jobs:
             -keystore "$ANDROID_KEYSTORE_FILE" \
             -storepass:env ANDROID_KEYSTORE_PASSWORD \
             -alias "$ANDROID_KEY_ALIAS" | tee "$RUNNER_TEMP/keystore-certificate.txt"
+          keytool -exportcert -rfc \
+            -keystore "$ANDROID_KEYSTORE_FILE" \
+            -storepass:env ANDROID_KEYSTORE_PASSWORD \
+            -alias "$ANDROID_KEY_ALIAS" > "$RUNNER_TEMP/release-certificate.pem"
+          openssl x509 -in "$RUNNER_TEMP/release-certificate.pem" -noout -fingerprint -sha256 -dates
+          openssl x509 -in "$RUNNER_TEMP/release-certificate.pem" -noout -checkend 0
+          NOT_BEFORE="$(openssl x509 -in "$RUNNER_TEMP/release-certificate.pem" -noout -startdate | cut -d= -f2-)"
+          if (( "$(date -u -d "$NOT_BEFORE" +%s)" > "$(date -u +%s)" )); then
+            echo "::error::Signing certificate is not valid yet."
+            exit 1
+          fi
           echo "ANDROID_KEYSTORE_FILE=$ANDROID_KEYSTORE_FILE" >> "$GITHUB_ENV"
 
       - name: Build signed release APK
