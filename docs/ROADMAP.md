@@ -3,7 +3,6 @@
 **Document status:** Canonical project roadmap  
 **Project:** VPN AI  
 **Repository:** https://github.com/hidooch980/VPN-AI  
-**Reference only:** https://github.com/mbm110/MSN-GUARD  
 **Target release:** `v1.0.0 Stable` (signed; no public beta/test APK)  
 **Product direction:** Android-first, AI-first, automation-first, security-first  
 **Last updated:** 2026-11-17
@@ -14,8 +13,7 @@
 
 Build an independent, reliable VPN application that automatically evaluates network conditions, selects an eligible connection path, maintains a secure tunnel, recovers from failures, and learns from verified outcomes.
 
-- This repository is an independent implementation. MSN-GUARD is a technical reference only; this project is not its fork.
-- No source code, assets, keys, branding, or private infrastructure are assumed to be reusable from the reference. Review the applicable license and obtain required permissions before any reuse.
+- The implementation is independently developed; all third-party components require explicit license, security, compatibility, and maintenance review before integration.
 - This project is separate from MolidoVPN AI. Do not import its code, modules, branding, keys, or architecture as project dependencies.
 - Android is the initial target. Other platforms require a separately approved scope.
 - Do not claim that a country, server, protocol, ping, speed, uptime, bypass, or availability works unless supported by current, reproducible measurements.
