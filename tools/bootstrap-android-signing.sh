@@ -12,10 +12,12 @@ ARCHIVE="$WORK_DIR/signing-backup.tar.gz"
 BACKUP="$HOME/vpn-ai-release-keystore.jks.enc"
 
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
-for cmd in gh keytool openssl base64; do command -v "$cmd" >/dev/null 2>&1 || fail "Required command not found: $cmd"; done
+for cmd in gh keytool openssl base64 git tar; do command -v "$cmd" >/dev/null 2>&1 || fail "Required command not found: $cmd"; done
 [[ -d .git ]] || fail "Run this script from the root of a cloned VPN-AI repository."
 CURRENT_REPO="$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null)" || fail "GitHub CLI is not authenticated. Run: gh auth login"
 [[ "$CURRENT_REPO" == "$REPO" ]] || fail "Wrong repository: expected $REPO, found $CURRENT_REPO"
+HAS_ADMIN="$(gh api "repos/$REPO" --jq '.permissions.admin' 2>/dev/null)" || fail "Cannot verify GitHub repository permissions."
+[[ "$HAS_ADMIN" == "true" ]] || fail "GitHub account needs repository administrator permission to configure Actions secrets and variables."
 CURRENT_BRANCH="$(git branch --show-current)"
 [[ "$CURRENT_BRANCH" == "$BRANCH" ]] || fail "Checkout branch $BRANCH first (current: $CURRENT_BRANCH)"
 [[ ! -e "$WORK_DIR" ]] || fail "Work directory already exists: $WORK_DIR"
