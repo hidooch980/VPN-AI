@@ -45,14 +45,14 @@ read -r -s -p "Repeat backup passphrase: " BACKUP_PASS2; printf '\n'
 [[ -n "$BACKUP_PASS" && "$BACKUP_PASS" == "$BACKUP_PASS2" ]] || fail "Backup passphrases do not match or are empty."
 
 {
-  printf 'ANDROID_KEYSTORE_PASSWORD=%s\\n' "$STORE_PASS"
-  printf 'ANDROID_KEY_ALIAS=%s\\n' "$ALIAS"
-  printf 'ANDROID_KEY_PASSWORD=%s\\n' "$KEY_PASS"
-  printf 'ANDROID_SIGNING_CERT_SHA256=%s\\n' "$CERT_FP"
+  printf 'ANDROID_KEYSTORE_PASSWORD=%s\n' "$STORE_PASS"
+  printf 'ANDROID_KEY_ALIAS=%s\n' "$ALIAS"
+  printf 'ANDROID_KEY_PASSWORD=%s\n' "$KEY_PASS"
+  printf 'ANDROID_SIGNING_CERT_SHA256=%s\n' "$CERT_FP"
 } > "$CREDENTIALS"
 chmod 600 "$CREDENTIALS"
 tar -czf "$ARCHIVE" -C "$WORK_DIR" "$(basename "$KEYSTORE")" "$(basename "$CREDENTIALS")"
-BACKUP_PASS="$BACKUP_PASS" openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt \\
+BACKUP_PASS="$BACKUP_PASS" openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt \
   -in "$ARCHIVE" -out "$BACKUP" -pass env:BACKUP_PASS
 chmod 600 "$BACKUP"
 unset BACKUP_PASS BACKUP_PASS2
