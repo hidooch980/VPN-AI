@@ -1,0 +1,3 @@
+-keep class com.wireguard.android.backend.GoBackend { *; }
+-keep class com.wireguard.android.backend.GoBackend$VpnService { *; }
+-keepclasseswithmembernames class * { native <methods>; }
