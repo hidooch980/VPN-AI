@@ -7,6 +7,10 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
+import android.widget.ScrollView
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.Button
@@ -26,6 +30,7 @@ import java.util.concurrent.TimeUnit
 
 class MainActivity : Activity() {
     private lateinit var statusView: TextView
+    private lateinit var profileView: TextView
     private var profileBytes: ByteArray? = null
     private val stateListener: (String) -> Unit = { state ->
         runOnUiThread { statusView.text = state }
@@ -108,41 +113,148 @@ class MainActivity : Activity() {
     }
 
     private fun buildScreen() {
+        window.statusBarColor = Color.rgb(11, 18, 32)
+        window.navigationBarColor = Color.rgb(11, 18, 32)
+        val scroll = ScrollView(this).apply {
+            fillViewport = true
+            setBackgroundColor(Color.rgb(11, 18, 32))
+        }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(32, 48, 32, 32)
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
+            setPadding(dp(20), dp(22), dp(20), dp(28))
         }
-        val title = TextView(this).apply {
-            text = "VPN AI"
-            textSize = 28f
+        scroll.addView(root)
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_LTR
+        }
+        val brand = column()
+        brand.addView(label("VPN AI", 25f, WHITE, true))
+        brand.addView(label("محافظ اتصال هوشمند", 12f, MUTED))
+        header.addView(brand, LinearLayout.LayoutParams(0, dp(54), 1f))
+        val logo = label("盾", 25f, TEAL, true).apply {
             gravity = Gravity.CENTER
+            background = rounded(BLUE_CARD, 18)
         }
-        statusView = TextView(this).apply {
-            text = "پروفایل بارگذاری نشده"
-            textSize = 16f
+        header.addView(logo, LinearLayout.LayoutParams(dp(54), dp(54)))
+        root.addView(header)
+        space(root, 22)
+
+        val hero = column().apply {
             gravity = Gravity.CENTER
-            setPadding(0, 28, 0, 28)
+            setPadding(dp(18), dp(22), dp(18), dp(22))
+            background = rounded(CARD, 24)
         }
-        val importButton = Button(this).apply {
-            text = "وارد کردن پروفایل WireGuard"
-            setOnClickListener { openProfilePicker() }
+        hero.addView(label("وضعیت اتصال", 14f, MUTED, true))
+        space(hero, 14)
+        val orb = label("⏻", 43f, TEAL, true).apply {
+            gravity = Gravity.CENTER
+            background = rounded(BLUE_CARD, 100)
         }
-        val connectButton = Button(this).apply {
-            text = "اتصال"
-            setOnClickListener { requestConnect() }
+        hero.addView(orb, LinearLayout.LayoutParams(dp(92), dp(92)))
+        space(hero, 13)
+        statusView = label("آماده اتصال", 18f, WHITE, true).apply { gravity = Gravity.CENTER }
+        hero.addView(statusView, matchWidth())
+        space(hero, 7)
+        hero.addView(label("برای شروع، پروفایل WireGuard خود را وارد کنید", 12f, MUTED).apply {
+            gravity = Gravity.CENTER
+        })
+        root.addView(hero, matchWidth())
+        space(root, 18)
+
+        val profileCard = column().apply {
+            setPadding(dp(16), dp(15), dp(16), dp(15))
+            background = rounded(CARD, 18)
         }
-        val disconnectButton = Button(this).apply {
-            text = "قطع اتصال"
-            setOnClickListener { WireGuardSessionController.disconnect() }
+        profileCard.addView(label("پروفایل اتصال", 15f, WHITE, true))
+        space(profileCard, 7)
+        profileView = label("هنوز پروفایلی انتخاب نشده است", 12f, MUTED)
+        profileCard.addView(profileView, matchWidth())
+        space(profileCard, 12)
+        profileCard.addView(actionButton("＋   وارد کردن پروفایل WireGuard", BLUE) {
+            openProfilePicker()
+        }, matchWidth())
+        root.addView(profileCard, matchWidth())
+        space(root, 14)
+        root.addView(actionButton("اتصال امن", TEAL_DARK) { requestConnect() }, matchWidth())
+        space(root, 9)
+        root.addView(actionButton("قطع اتصال", BUTTON_DARK) {
+            WireGuardSessionController.disconnect()
+        }, matchWidth())
+        space(root, 20)
+
+        root.addView(label("وضعیت شبکه", 17f, WHITE, true))
+        space(root, 10)
+        val metrics = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutDirection = View.LAYOUT_DIRECTION_RTL
         }
-        root.addView(title, matchWidth())
-        root.addView(statusView, matchWidth())
-        root.addView(importButton, matchWidth())
-        root.addView(connectButton, matchWidth())
-        root.addView(disconnectButton, matchWidth())
-        setContentView(root)
+        metrics.addView(metricCard("پینگ", "اندازه‌گیری نشده"), weightedParams())
+        metrics.addView(metricCard("دانلود", "اندازه‌گیری نشده"), weightedParams().apply { marginStart = dp(8) })
+        metrics.addView(metricCard("آپلود", "اندازه‌گیری نشده"), weightedParams().apply { marginStart = dp(8) })
+        root.addView(metrics, matchWidth())
+        space(root, 18)
+
+        val security = column().apply {
+            setPadding(dp(16), dp(15), dp(16), dp(15))
+            background = rounded(CARD, 18)
+        }
+        security.addView(label("امنیت و محافظت", 15f, WHITE, true))
+        space(security, 8)
+        security.addView(label("وضعیت DNS، IPv4 و IPv6 پس از آزمون‌های واقعی نمایش داده می‌شود.", 12f, MUTED))
+        space(security, 8)
+        security.addView(label("محافظت سراسری و Kill Switch هنوز تأیید نشده‌اند.", 12f, AMBER))
+        root.addView(security, matchWidth())
+        space(root, 22)
+        root.addView(label("VPN AI  •  نسخه اولیه", 11f, MUTED).apply { gravity = Gravity.CENTER }, matchWidth())
+        setContentView(scroll)
     }
+
+    private fun metricCard(title: String, value: String) = column().apply {
+        setPadding(dp(10), dp(13), dp(10), dp(13))
+        background = rounded(CARD, 16)
+        addView(label(title, 12f, MUTED, true))
+        space(this, 7)
+        addView(label(value, 10f, WHITE))
+    }
+
+    private fun actionButton(title: String, color: Int, action: () -> Unit) = Button(this).apply {
+        text = title
+        textSize = 14f
+        isAllCaps = false
+        setTextColor(WHITE)
+        background = rounded(color, 15)
+        minHeight = dp(52)
+        setOnClickListener { action() }
+    }
+
+    private fun label(value: String, size: Float, color: Int, bold: Boolean = false) =
+        TextView(this).apply {
+            text = value
+            textSize = size
+            setTextColor(color)
+            if (bold) setTypeface(typeface, Typeface.BOLD)
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+    private fun column() = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        layoutDirection = View.LAYOUT_DIRECTION_RTL
+    }
+
+    private fun rounded(color: Int, radius: Int) = GradientDrawable().apply {
+        setColor(color)
+        cornerRadius = dp(radius).toFloat()
+    }
+
+    private fun space(parent: LinearLayout, height: Int) {
+        parent.addView(View(this), LinearLayout.LayoutParams(1, dp(height)))
+    }
+
+    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+    private fun weightedParams() = LinearLayout.LayoutParams(0, dp(78), 1f)
 
     private fun matchWidth() = LinearLayout.LayoutParams(
         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
@@ -151,7 +263,7 @@ class MainActivity : Activity() {
     private fun openProfilePicker() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
-            type = "text/plain"
+            type = "*/*"
         }
         startActivityForResult(intent, REQUEST_PROFILE)
     }
@@ -185,10 +297,12 @@ class MainActivity : Activity() {
                 ProfileInputPolicy.validateSize(bytes.size)
                 profileBytes?.fill(0)
                 profileBytes = bytes
-                statusView.text = "پروفایل دریافت شد؛ آماده اعتبارسنجی"
+                profileView.text = "پروفایل انتخاب شده و آماده اعتبارسنجی است"
+                statusView.text = "پروفایل دریافت شد؛ آماده اتصال"
             } catch (error: Exception) {
                 profileBytes?.fill(0)
                 profileBytes = null
+                profileView.text = "پروفایل بارگذاری نشد"
                 statusView.text = "بارگذاری پروفایل ناموفق بود"
                 Toast.makeText(this, error.message ?: "خطای فایل", Toast.LENGTH_LONG).show()
             }
