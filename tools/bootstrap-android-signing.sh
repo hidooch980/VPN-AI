@@ -7,6 +7,8 @@ BRANCH="foundation/vpn-ai-start"
 ALIAS="vpnai-release"
 WORK_DIR="$HOME/.vpn-ai-signing-bootstrap"
 KEYSTORE="$WORK_DIR/vpn-ai-release.jks"
+CREDENTIALS="$WORK_DIR/signing-credentials.txt"
+ARCHIVE="$WORK_DIR/signing-backup.tar.gz"
 BACKUP="$HOME/vpn-ai-release-keystore.jks.enc"
 
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
@@ -42,8 +44,16 @@ read -r -s -p "Backup encryption passphrase: " BACKUP_PASS; printf '\n'
 read -r -s -p "Repeat backup passphrase: " BACKUP_PASS2; printf '\n'
 [[ -n "$BACKUP_PASS" && "$BACKUP_PASS" == "$BACKUP_PASS2" ]] || fail "Backup passphrases do not match or are empty."
 
-BACKUP_PASS="$BACKUP_PASS" openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt \
-  -in "$KEYSTORE" -out "$BACKUP" -pass env:BACKUP_PASS
+{
+  printf 'ANDROID_KEYSTORE_PASSWORD=%s\\n' "$STORE_PASS"
+  printf 'ANDROID_KEY_ALIAS=%s\\n' "$ALIAS"
+  printf 'ANDROID_KEY_PASSWORD=%s\\n' "$KEY_PASS"
+  printf 'ANDROID_SIGNING_CERT_SHA256=%s\\n' "$CERT_FP"
+} > "$CREDENTIALS"
+chmod 600 "$CREDENTIALS"
+tar -czf "$ARCHIVE" -C "$WORK_DIR" "$(basename "$KEYSTORE")" "$(basename "$CREDENTIALS")"
+BACKUP_PASS="$BACKUP_PASS" openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt \\
+  -in "$ARCHIVE" -out "$BACKUP" -pass env:BACKUP_PASS
 chmod 600 "$BACKUP"
 unset BACKUP_PASS BACKUP_PASS2
 
