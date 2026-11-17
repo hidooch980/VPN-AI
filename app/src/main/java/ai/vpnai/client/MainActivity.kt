@@ -37,6 +37,10 @@ class MainActivity : Activity() {
         WireGuardSessionController.addListener(stateListener)
         statusView.text = WireGuardSessionController.currentStatus
         scheduleAutomaticUpdates()
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), REQUEST_NOTIFICATIONS)
+        }
         if (intent.getBooleanExtra(ReleaseUpdateWorker.EXTRA_INSTALL_UPDATE, false)) {
             installDownloadedUpdate()
         }
@@ -215,5 +219,6 @@ class MainActivity : Activity() {
         private const val REQUEST_PROFILE = 1001
         private const val REQUEST_VPN_CONSENT = 1002
         private const val REQUEST_INSTALL_PERMISSION = 1003
+        private const val REQUEST_NOTIFICATIONS = 1004
     }
 }
