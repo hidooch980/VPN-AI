@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+val ciRunNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
 val releaseStoreFile = System.getenv("ANDROID_KEYSTORE_FILE")
 val releaseStorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
 val releaseKeyAlias = System.getenv("ANDROID_KEY_ALIAS")
@@ -16,8 +17,7 @@ val releaseTaskRequested = gradle.startParameter.taskNames.any {
 }
 if (releaseTaskRequested && !releaseSigningReady) {
     throw GradleException(
-        "Release signing is not configured. Required environment variables: " +
-            "ANDROID_KEYSTORE_FILE, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD."
+        "Release signing is not configured. A persistent signing keystore is required."
     )
 }
 
@@ -28,8 +28,8 @@ android {
         applicationId = "ai.vpnai.client"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = ciRunNumber
+        versionName = "1.0.$ciRunNumber"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     compileOptions {
@@ -60,6 +60,8 @@ android {
 }
 dependencies {
     implementation("com.wireguard.android:tunnel:1.0.20260102")
+    implementation("androidx.core:core-ktx:1.15.0")
+    implementation("androidx.work:work-runtime-ktx:2.10.1")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     testImplementation("junit:junit:4.13.2")
 }
