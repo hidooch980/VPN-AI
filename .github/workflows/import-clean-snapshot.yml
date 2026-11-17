@@ -56,8 +56,10 @@ jobs:
         run: |
           set -euo pipefail
           go install github.com/zricethezav/gitleaks/v8@v8.24.2
-          "$(go env GOPATH)/bin/gitleaks" dir --redact --exit-code 1 ../source
-          if find ../source -path ../source/.git -prune -o -type f \( -name '*.jks' -o -name '*.keystore' -o -name '*.p12' -o -name '*.apk' -o -name '*.aab' -o -name '.env' -o -name '.env.*' -o -name '*.pem' -o -name 'local.properties' \) -print -quit | grep -q .; then
+          mkdir -p ../source-scan
+          rsync -a --exclude=.git ../source/ ../source-scan/
+          "$(go env GOPATH)/bin/gitleaks" dir --redact --exit-code 1 ../source-scan
+          if find ../source-scan -type f \( -name '*.jks' -o -name '*.keystore' -o -name '*.p12' -o -name '*.apk' -o -name '*.aab' -o -name '.env' -o -name '.env.*' -o -name '*.pem' -o -name 'local.properties' \) -print -quit | grep -q .; then
             echo "::error::A signing, environment, certificate, or build artifact file was found."
             exit 1
           fi
