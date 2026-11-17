@@ -383,14 +383,14 @@ class MainActivity : Activity() {
         private const val REQUEST_VPN_CONSENT = 1002
         private const val REQUEST_INSTALL_PERMISSION = 1003
         private const val REQUEST_NOTIFICATIONS = 1004
-        private const val BG = Color.rgb(8, 13, 25)
-        private const val CARD = Color.rgb(17, 27, 45)
-        private const val PANEL = Color.rgb(26, 39, 59)
-        private const val DARK_CYAN = Color.rgb(13, 48, 60)
-        private const val STROKE = Color.rgb(42, 62, 84)
-        private const val CYAN = Color.rgb(72, 225, 208)
-        private const val WHITE = Color.rgb(238, 245, 255)
-        private const val MUTED = Color.rgb(148, 166, 190)
-        private const val WARNING = Color.rgb(255, 190, 90)
+        private val BG = Color.rgb(8, 13, 25)
+        private val CARD = Color.rgb(17, 27, 45)
+        private val PANEL = Color.rgb(26, 39, 59)
+        private val DARK_CYAN = Color.rgb(13, 48, 60)
+        private val STROKE = Color.rgb(42, 62, 84)
+        private val CYAN = Color.rgb(72, 225, 208)
+        private val WHITE = Color.rgb(238, 245, 255)
+        private val MUTED = Color.rgb(148, 166, 190)
+        private val WARNING = Color.rgb(255, 190, 90)
     }
 }
