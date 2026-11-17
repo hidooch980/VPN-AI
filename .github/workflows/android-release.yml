@@ -153,10 +153,10 @@ jobs:
           VERSION="1.0.${GITHUB_RUN_NUMBER}"
           TAG="v${VERSION}"
           APK="app/build/outputs/apk/release/app-release.apk"
-          gh release create "$TAG" "$APK#VPN AI Android APK" \\
-            "app/build/outputs/apk/release/SHA256SUMS.txt#APK SHA-256" \\
-            "app/build/outputs/apk/release/APK-CERTIFICATE.txt#APK signing certificate" \\
-            --title "VPN AI ${VERSION}" \\
+          gh release create "$TAG" "$APK#VPN AI Android APK" \
+            "app/build/outputs/apk/release/SHA256SUMS.txt#APK SHA-256" \
+            "app/build/outputs/apk/release/APK-CERTIFICATE.txt#APK signing certificate" \
+            --title "VPN AI ${VERSION}" \
             --notes "Automatic stable release. Android verifies package signature during installation; APK SHA-256 is published as release asset metadata."
 
       - name: Upload signed release APK and verification records
