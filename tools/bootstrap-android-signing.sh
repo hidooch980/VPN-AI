@@ -5,11 +5,11 @@ umask 077
 REPO="hidooch980/VPN-AI"
 BRANCH="foundation/vpn-ai-start"
 ALIAS="vpnai-release"
-WORK_DIR="${HOME}/.vpn-ai-signing-bootstrap"
-KEYSTORE="${WORK_DIR}/vpn-ai-release.jks"
-BACKUP="${HOME}/vpn-ai-release-keystore.jks.enc"
+WORK_DIR="$HOME/.vpn-ai-signing-bootstrap"
+KEYSTORE="$WORK_DIR/vpn-ai-release.jks"
+BACKUP="$HOME/vpn-ai-release-keystore.jks.enc"
 
-fail() { printf 'ERROR: %s\\n' "$*" >&2; exit 1; }
+fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 for cmd in gh keytool openssl base64; do command -v "$cmd" >/dev/null 2>&1 || fail "Required command not found: $cmd"; done
 [[ -d .git ]] || fail "Run this script from the root of a cloned VPN-AI repository."
 CURRENT_REPO="$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null)" || fail "GitHub CLI is not authenticated. Run: gh auth login"
@@ -25,37 +25,37 @@ trap cleanup EXIT
 
 STORE_PASS="$(openssl rand -hex 32)"
 KEY_PASS="$(openssl rand -hex 32)"
-read -r -p "Key alias [${ALIAS}]: " ENTERED_ALIAS
-ALIAS="${ENTERED_ALIAS:-$ALIAS}"
+read -r -p "Key alias [$ALIAS]: " ENTERED_ALIAS
+if [[ -n "$ENTERED_ALIAS" ]]; then ALIAS="$ENTERED_ALIAS"; fi
 
-keytool -genkeypair -noprompt -v \\
-  -keystore "$KEYSTORE" -storetype JKS \\
-  -storepass "$STORE_PASS" -keypass "$KEY_PASS" \\
-  -alias "$ALIAS" -keyalg RSA -keysize 4096 -validity 10000 \\
+keytool -genkeypair -noprompt -v \
+  -keystore "$KEYSTORE" -storetype JKS \
+  -storepass "$STORE_PASS" -keypass "$KEY_PASS" \
+  -alias "$ALIAS" -keyalg RSA -keysize 4096 -validity 10000 \
   -dname "CN=VPN AI Android Release, OU=Mobile, O=VPN AI, C=US"
 
 CERT_FP="$(keytool -exportcert -rfc -keystore "$KEYSTORE" -storepass "$STORE_PASS" -alias "$ALIAS" | openssl x509 -noout -fingerprint -sha256 | cut -d= -f2 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
-[[ "${#CERT_FP}" -eq 64 ]] || fail "Could not calculate a valid SHA-256 certificate fingerprint."
+[[ "$(printf '%s' "$CERT_FP" | wc -c)" -eq 64 ]] || fail "Could not calculate a valid SHA-256 certificate fingerprint."
 
-printf '\\nCreate a strong passphrase to encrypt the offline Keystore backup.\\n'
-read -r -s -p "Backup encryption passphrase: " BACKUP_PASS; printf '\\n'
-read -r -s -p "Repeat backup passphrase: " BACKUP_PASS2; printf '\\n'
+printf '\nCreate a strong passphrase to encrypt the offline Keystore backup.\n'
+read -r -s -p "Backup encryption passphrase: " BACKUP_PASS; printf '\n'
+read -r -s -p "Repeat backup passphrase: " BACKUP_PASS2; printf '\n'
 [[ -n "$BACKUP_PASS" && "$BACKUP_PASS" == "$BACKUP_PASS2" ]] || fail "Backup passphrases do not match or are empty."
 
-BACKUP_PASS="$BACKUP_PASS" openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt \\
+BACKUP_PASS="$BACKUP_PASS" openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt \
   -in "$KEYSTORE" -out "$BACKUP" -pass env:BACKUP_PASS
 chmod 600 "$BACKUP"
 unset BACKUP_PASS BACKUP_PASS2
 
 # Secret values are piped on stdin; none are printed or passed as command-line arguments.
-base64 -w0 "$KEYSTORE" | gh secret set ANDROID_KEYSTORE_BASE64 --repo "$REPO"
+base64 "$KEYSTORE" | tr -d '\n' | gh secret set ANDROID_KEYSTORE_BASE64 --repo "$REPO"
 printf '%s' "$STORE_PASS" | gh secret set ANDROID_KEYSTORE_PASSWORD --repo "$REPO"
 printf '%s' "$ALIAS" | gh secret set ANDROID_KEY_ALIAS --repo "$REPO"
 printf '%s' "$KEY_PASS" | gh secret set ANDROID_KEY_PASSWORD --repo "$REPO"
 printf '%s' "$CERT_FP" | gh variable set ANDROID_SIGNING_CERT_SHA256 --repo "$REPO"
 
-printf '\\nSUCCESS: GitHub signing secrets and pinned certificate fingerprint were configured.\\n'
-printf 'Repository: %s\\nBranch: %s\\nAlias: %s\\nCertificate SHA-256: %s\\n' "$REPO" "$BRANCH" "$ALIAS" "$CERT_FP"
-printf 'Encrypted offline backup: %s\\n' "$BACKUP"
-printf 'Keep the backup passphrase separately. Never upload the backup or Keystore to GitHub.\\n'
-printf 'The temporary plaintext Keystore and generated passwords have been removed.\\n'
+printf '\nSUCCESS: GitHub signing secrets and pinned certificate fingerprint were configured.\n'
+printf 'Repository: %s\nBranch: %s\nAlias: %s\nCertificate SHA-256: %s\n' "$REPO" "$BRANCH" "$ALIAS" "$CERT_FP"
+printf 'Encrypted offline backup: %s\n' "$BACKUP"
+printf 'Keep the backup passphrase separately. Never upload the backup or Keystore to GitHub.\n'
+printf 'The temporary plaintext Keystore and generated passwords have been removed.\n'
