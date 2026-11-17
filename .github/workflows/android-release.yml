@@ -3,10 +3,9 @@ name: Android Signed Release
 on:
   push:
     branches: ["foundation/vpn-ai-start"]
-  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: android-signed-release
@@ -135,10 +134,25 @@ jobs:
             fi
           fi
 
+      - name: Publish versioned GitHub release for automatic updates
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="1.0.${GITHUB_RUN_NUMBER}"
+          TAG="v${VERSION}"
+          APK="app/build/outputs/apk/release/app-release.apk"
+          gh release create "$TAG" "$APK#VPN AI Android APK" \\
+            "app/build/outputs/apk/release/SHA256SUMS.txt#APK SHA-256" \\
+            "app/build/outputs/apk/release/APK-CERTIFICATE.txt#APK signing certificate" \\
+            --title "VPN AI ${VERSION}" \\
+            --notes "Automatic stable release. Android verifies package signature during installation; APK SHA-256 is published as release asset metadata."
+
       - name: Upload signed release APK and verification records
         uses: actions/upload-artifact@v4
         with:
-          name: vpn-ai-0.1.0-release
+          name: vpn-ai-1.0.${{ github.run_number }}-release
           path: |
             app/build/outputs/apk/release/app-release.apk
             app/build/outputs/apk/release/SHA256SUMS.txt
