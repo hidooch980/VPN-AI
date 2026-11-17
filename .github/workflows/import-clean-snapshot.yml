@@ -1,0 +1,100 @@
+name: Import clean MolidoVPN source snapshot
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type IMPORT_CLEAN_SNAPSHOT to run the secret-scanned source-only import
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: clean-source-snapshot-import
+  cancel-in-progress: false
+
+jobs:
+  import-source-snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate explicit confirmation
+        shell: bash
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          if [[ "$CONFIRMATION" != "IMPORT_CLEAN_SNAPSHOT" ]]; then
+            echo "::error::Confirmation did not match."
+            exit 1
+          fi
+
+      - name: Checkout destination repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          path: destination
+
+      - name: Checkout reviewed source commit without history
+        uses: actions/checkout@v4
+        with:
+          repository: hidooch980/Molido-vpn
+          ref: bc99183197e6929194acbf42fa4acb36b597740c
+          fetch-depth: 1
+          path: source
+
+      - name: Install pinned Gitleaks scanner
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.2'
+          cache: false
+
+      - name: Scan source snapshot for secrets
+        shell: bash
+        working-directory: destination
+        run: |
+          set -euo pipefail
+          go install github.com/zricethezav/gitleaks/v8@v8.24.2
+          "$(go env GOPATH)/bin/gitleaks" dir --redact --exit-code 1 ../source
+          if find ../source -path ../source/.git -prune -o -type f \\
+            \\( -name '*.jks' -o -name '*.keystore' -o -name '*.p12' -o \\
+               -name '*.apk' -o -name '*.aab' -o -name '.env' -o -name '.env.*' -o \\
+               -name '*.pem' -o -name 'local.properties' \\) -print -quit | grep -q .; then
+            echo "::error::A signing, environment, certificate, or build artifact file was found."
+            exit 1
+          fi
+
+      - name: Create clean source-only branch
+        shell: bash
+        working-directory: destination
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b clean-import/2026-11
+          rsync -a --delete --exclude='.git' \\
+            --exclude='.github/workflows/import-clean-snapshot.yml' \\
+            ../source/ ./
+          mkdir -p docs
+          cat > docs/MIGRATION_PROVENANCE.md <<'EOF'
+          # Clean source snapshot provenance
+
+          - Source repository: https://github.com/hidooch980/Molido-vpn
+          - Source commit: bc99183197e6929194acbf42fa4acb36b597740c
+          - Import method: source snapshot; source Git history is not copied.
+          - Import gate: Gitleaks filesystem scan and forbidden artifact filename check.
+          - This file does not certify physical VPN acceptance, release signing, or production readiness.
+          EOF
+          git add -A
+          git diff --cached --check
+          git commit -m "Import reviewed MolidoVPN source snapshot without history"
+          git push --set-upstream origin clean-import/2026-11
+
+      - name: Report imported commit
+        if: success()
+        shell: bash
+        working-directory: destination
+        run: |
+          echo "Clean snapshot branch pushed:"
+          git rev-parse HEAD
