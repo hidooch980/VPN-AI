@@ -347,8 +347,10 @@ Every progress report must identify commit/branch, tests actually run, result, e
 
 ## 11. Current project truth
 
-At the time this roadmap was written:
-- The repository contains initial documentation, not a completed VPN application.
+At the current checkpoint:
+- The repository now contains an initial Android application shell, a WireGuard profile import flow, a serialized WireGuard backend controller, and Android CI/CodeQL workflows.
+- The WireGuard integration is in development; it has not yet passed CI or physical-device data-plane testing.
+- DNS/IPv4/IPv6 leak verification, Kill Switch validation, measured server selection, automated failover, AI learning, and secure updates remain incomplete.
 - No engine is declared production-ready.
 - No real-device field-test result is claimed by this document.
 - No signed APK or public release is claimed.
