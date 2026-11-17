@@ -136,108 +136,146 @@ class MainActivity : Activity() {
         val scroll = ScrollView(this).apply {
             setBackgroundColor(BG)
             isFillViewport = true
+            clipToPadding = false
         }
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
+        val root = column().apply {
             layoutDirection = View.LAYOUT_DIRECTION_LOCALE
-            setPadding(dp(20), dp(20), dp(20), dp(24))
+            setPadding(dp(20), dp(18), dp(20), dp(28))
         }
 
+        // Brand header inspired by the supplied MolidoVPN reference.
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        val brand = column().apply {
-            addView(label("VPN AI", 25f, WHITE, true))
-            addView(label(tr("شبکه امن هوشمند", "INTELLIGENT SECURE NETWORK"), 10f, MUTED, false))
-        }
+        val brand = column()
+        brand.addView(label("MolidoVPN", 23f, WHITE, true))
+        brand.addView(label(tr("شبکه خصوصی هوشمند", "SMART PRIVATE NETWORK"), 9f, MUTED, true))
         header.addView(brand, LinearLayout.LayoutParams(0, -2, 1f))
-        header.addView(pill(tr("نسخه پایه", "FOUNDATION"), CYAN))
+        header.addView(pill(tr("●  متصل نیست", "●  OFFLINE"), WARNING))
         root.addView(header, matchWrap())
         root.addView(space(22))
 
-        root.addView(label(tr("مرکز کنترل", "CONTROL CENTER"), 11f, CYAN, true))
-        root.addView(space(8))
+        root.addView(label(tr("داشبورد", "DASHBOARD"), 11f, CYAN, true))
+        root.addView(space(9))
+
+        // Main connection card.
         val hero = column().apply {
-            gravity = Gravity.CENTER
-            setPadding(dp(18), dp(22), dp(18), dp(20))
-            background = rounded(CARD, 24, STROKE)
+            background = rounded(CARD, 26, STROKE)
+            setPadding(dp(18), dp(18), dp(18), dp(16))
         }
-        val orb = TextView(this).apply {
-            text = "◉"
-            textSize = 48f
-            gravity = Gravity.CENTER
-            setTextColor(CYAN)
-            background = rounded(DARK_CYAN, 60, CYAN)
-            setPadding(dp(16), dp(5), dp(16), dp(5))
+        val heroTop = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutDirection = View.LAYOUT_DIRECTION_LOCALE
         }
-        hero.addView(orb)
-        hero.addView(space(12))
-        hero.addView(label(tr("اتصال برقرار نیست", "NOT CONNECTED"), 17f, WHITE, true).also { statusView = it })
-        hero.addView(space(5))
-        hero.addView(label(tr("برای شروع، پروفایل WireGuard را وارد کنید", "Import a WireGuard profile to get started"), 12f, MUTED, false))
-        hero.addView(space(16))
-        connectButton = actionButton(tr("اتصال", "CONNECT"), CYAN, BG).apply {
+        val actionColumn = column().apply { gravity = Gravity.CENTER }
+        connectButton = actionButton("⏻", CYAN, BG).apply {
+            textSize = 35f
+            minWidth = dp(76)
+            minHeight = dp(76)
             setOnClickListener { requestConnect() }
         }
+        actionColumn.addView(connectButton, LinearLayout.LayoutParams(dp(82), dp(82)))
+        actionColumn.addView(space(6))
+        actionColumn.addView(label(tr("برای اتصال", "TAP TO CONNECT"), 9f, MUTED, true))
+        heroTop.addView(actionColumn, LinearLayout.LayoutParams(dp(94), -2))
+
+        val stateColumn = column().apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(8), 0, dp(4), 0)
+        }
+        stateColumn.addView(pill(tr("آماده اتصال", "READY TO CONNECT"), CYAN))
+        stateColumn.addView(space(10))
+        stateColumn.addView(label(tr("اتصال برقرار نیست", "Not connected"), 18f, WHITE, true).also { statusView = it })
+        stateColumn.addView(space(5))
+        stateColumn.addView(label(tr("برای شروع، پروفایل WireGuard را وارد کنید", "Import a WireGuard profile to begin"), 11f, MUTED, false))
+        heroTop.addView(stateColumn, LinearLayout.LayoutParams(0, -2, 1f))
+        hero.addView(heroTop, matchWrap())
+        hero.addView(space(16))
+
+        val metrics = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            background = rounded(BG, 18, STROKE)
+            setPadding(dp(10), dp(12), dp(10), dp(12))
+            layoutDirection = View.LAYOUT_DIRECTION_LOCALE
+        }
+        metrics.addView(metricCell(tr("پینگ", "PING"), "—", CYAN), LinearLayout.LayoutParams(0, -2, 1f))
+        metrics.addView(metricCell(tr("دانلود", "DOWNLOAD"), "— B/s", MUTED), LinearLayout.LayoutParams(0, -2, 1f))
+        metrics.addView(metricCell(tr("آپلود", "UPLOAD"), "— B/s", MUTED), LinearLayout.LayoutParams(0, -2, 1f))
+        hero.addView(metrics, matchWrap())
+        hero.addView(space(12))
         disconnectButton = actionButton(tr("قطع اتصال", "DISCONNECT"), PANEL, WHITE).apply {
             setOnClickListener { WireGuardSessionController.disconnect() }
         }
-        hero.addView(connectButton, matchWrap())
-        hero.addView(space(8))
         hero.addView(disconnectButton, matchWrap())
         root.addView(hero, matchWrap())
 
-        root.addView(space(18))
-        root.addView(sectionTitle(tr("شبکه و ترافیک", "NETWORK & TRAFFIC")))
-        val network = card()
-        network.addView(infoRow(tr("وضعیت تونل", "Tunnel state"), tr("هنوز متصل نیست", "Not connected"), CYAN))
-        network.addView(separator())
-        network.addView(infoRow(tr("پینگ", "Latency"), tr("پس از اتصال و اندازه‌گیری", "Awaiting measurement"), MUTED))
-        network.addView(separator())
-        network.addView(infoRow(tr("دانلود / آپلود", "Download / Upload"), tr("داده آماری موجود نیست", "No telemetry available"), MUTED))
-        network.addView(separator())
-        network.addView(infoRow(tr("مصرف داده", "Data usage"), tr("هنوز اندازه‌گیری نمی‌شود", "Not measured yet"), MUTED))
-        root.addView(network)
+        root.addView(space(13))
+        val ipCard = card().apply {
+            background = rounded(Color.rgb(15, 34, 48), 20, Color.rgb(105, 99, 59))
+        }
+        ipCard.addView(label(tr("آی‌پی عمومی", "PUBLIC IP"), 10f, MUTED, true))
+        ipCard.addView(space(5))
+        ipCard.addView(label("— — — — — —", 21f, WHITE, true))
+        ipCard.addView(label(tr("پس از اتصال و دریافت داده واقعی نمایش داده می‌شود", "Shown after connection and verified measurement"), 10f, MUTED, false))
+        root.addView(ipCard, matchWrap())
 
-        root.addView(space(14))
-        root.addView(sectionTitle(tr("کشورها و سرورها", "LOCATIONS & SERVERS")))
-        val servers = card()
-        servers.addView(label(tr("انتخاب سرور در دسترس نیست", "Server selection unavailable"), 14f, WHITE, true))
-        servers.addView(space(5))
-        servers.addView(label(tr("هنوز فهرست سرور معتبر یا سرویس دریافت موقعیت متصل نشده است. هیچ کشور یا پینگی حدس زده نمی‌شود.", "No verified server directory or location provider is connected yet. Countries and latency are not fabricated."), 12f, MUTED, false))
-        servers.addView(space(10))
-        val importButton = actionButton(tr("وارد کردن فایل کانفیگ", "IMPORT CONFIG FILE"), DARK_CYAN, CYAN).apply {
+        root.addView(space(15))
+        root.addView(sectionTitle(tr("وضعیت سرویس‌ها", "SERVICE STATUS")))
+        val pair = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutDirection = View.LAYOUT_DIRECTION_LOCALE
+        }
+        val serverCard = card()
+        serverCard.addView(label("◎  " + tr("سرورها", "SERVERS"), 13f, CYAN, true))
+        serverCard.addView(space(7))
+        serverCard.addView(label(tr("فهرست سرور متصل نیست", "No server directory connected"), 11f, WHITE, true))
+        serverCard.addView(space(4))
+        serverCard.addView(label(tr("موقعیت و پینگ نامشخص", "Location and ping unavailable"), 10f, MUTED, false))
+        val securityCard = card()
+        securityCard.addView(label("⬡  " + tr("امنیت", "SECURITY"), 13f, CYAN, true))
+        securityCard.addView(space(7))
+        securityCard.addView(label(tr("آزمون‌ها تأیید نشده‌اند", "Tests not verified"), 11f, WHITE, true))
+        securityCard.addView(space(4))
+        securityCard.addView(label(tr("DNS • IPv4/IPv6 • Kill Switch", "DNS • IPv4/IPv6 • Kill Switch"), 9f, MUTED, false))
+        pair.addView(serverCard, LinearLayout.LayoutParams(0, -2, 1f).apply { marginEnd = dp(6) })
+        pair.addView(securityCard, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(6) })
+        root.addView(pair, matchWrap())
+
+        root.addView(space(13))
+        root.addView(sectionTitle(tr("هوش مصنوعی و ترافیک", "AI & TRAFFIC")))
+        val intelligence = card()
+        intelligence.addView(label(tr("دستیار هوشمند", "AI ASSISTANT"), 13f, CYAN, true))
+        intelligence.addView(space(5))
+        intelligence.addView(label(tr("تحلیل و انتخاب خودکار تا زمان اتصال منابع داده معتبر غیرفعال است.", "Analysis and automatic selection stay inactive until trusted live data sources are connected."), 11f, MUTED, false))
+        intelligence.addView(separator())
+        intelligence.addView(infoRow(tr("مصرف ترافیک", "Traffic usage"), tr("هنوز اندازه‌گیری نشده", "Not measured"), MUTED))
+        intelligence.addView(space(8))
+        val importButton = actionButton(tr("＋  وارد کردن پروفایل WireGuard", "＋  IMPORT WIREGUARD PROFILE"), DARK_CYAN, CYAN).apply {
             setOnClickListener { openProfilePicker() }
         }
-        servers.addView(importButton, matchWrap())
-        profileView = label(tr("پروفایلی انتخاب نشده", "No profile selected"), 11f, MUTED, false)
-        servers.addView(space(8))
-        servers.addView(profileView)
-        root.addView(servers)
-
-        root.addView(space(14))
-        root.addView(sectionTitle(tr("امنیت و محافظت", "SECURITY & PROTECTION")))
-        val security = card()
-        security.addView(infoRow(tr("موتور WireGuard", "WireGuard engine"), tr("یکپارچه‌سازی اولیه", "Integrated; device test pending"), CYAN))
-        security.addView(separator())
-        security.addView(infoRow(tr("آزمون نشت DNS و IP", "DNS / IP leak tests"), tr("تأیید نشده", "Not verified"), WARNING))
-        security.addView(separator())
-        security.addView(infoRow(tr("Kill Switch", "Kill switch"), tr("هنوز تأیید نشده", "Not verified"), WARNING))
-        root.addView(security)
-
-        root.addView(space(14))
-        root.addView(sectionTitle(tr("دستیار هوشمند", "AI ASSISTANT")))
-        val ai = card()
-        ai.addView(label(tr("موتور تحلیل هوشمند در حال توسعه است", "AI decision engine is under development"), 14f, WHITE, true))
-        ai.addView(space(5))
-        ai.addView(label(tr("انتخاب خودکار سرور و تصمیم‌گیری شبکه فقط پس از اتصال منابع داده واقعی فعال می‌شود.", "Automatic server selection and network decisions will remain inactive until verified live data sources are integrated."), 12f, MUTED, false))
-        root.addView(ai)
+        intelligence.addView(importButton, matchWrap())
+        profileView = label(tr("پروفایلی انتخاب نشده", "No profile selected"), 10f, MUTED, false)
+        intelligence.addView(space(7))
+        intelligence.addView(profileView)
+        root.addView(intelligence, matchWrap())
 
         root.addView(space(18))
-        root.addView(label(tr("VPN AI  •  داده‌های واقعی، بدون آمار ساختگی", "VPN AI  •  REAL DATA, NO FABRICATED METRICS"), 10f, MUTED, false).apply { gravity = Gravity.CENTER })
+        root.addView(label(tr("MOLIDOVPN  •  حریم خصوصی با داده‌های قابل‌اعتماد", "MOLIDOVPN  •  PRIVACY BUILT ON VERIFIED DATA"), 9f, MUTED, true).apply {
+            gravity = Gravity.CENTER
+        })
         scroll.addView(root)
         setContentView(scroll)
+    }
+
+    private fun metricCell(title: String, value: String, color: Int): View {
+        val cell = column().apply { gravity = Gravity.CENTER }
+        cell.addView(label(title, 9f, MUTED, true).apply { gravity = Gravity.CENTER })
+        cell.addView(space(4))
+        cell.addView(label(value, 12f, color, true).apply { gravity = Gravity.CENTER })
+        return cell
     }
 
     private fun requestConnect() {
