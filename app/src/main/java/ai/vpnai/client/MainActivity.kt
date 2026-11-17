@@ -3,14 +3,26 @@ package ai.vpnai.client
 import android.app.Activity
 import android.content.Intent
 import android.net.VpnService
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.FileProvider
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.util.concurrent.TimeUnit
 
 class MainActivity : Activity() {
     private lateinit var statusView: TextView
@@ -24,11 +36,71 @@ class MainActivity : Activity() {
         buildScreen()
         WireGuardSessionController.addListener(stateListener)
         statusView.text = WireGuardSessionController.currentStatus
+        scheduleAutomaticUpdates()
+        if (intent.getBooleanExtra(ReleaseUpdateWorker.EXTRA_INSTALL_UPDATE, false)) {
+            installDownloadedUpdate()
+        }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent?.getBooleanExtra(ReleaseUpdateWorker.EXTRA_INSTALL_UPDATE, false) == true) {
+            installDownloadedUpdate()
+        }
     }
 
     override fun onDestroy() {
         WireGuardSessionController.removeListener(stateListener)
         super.onDestroy()
+    }
+
+    private fun scheduleAutomaticUpdates() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+        val periodic = PeriodicWorkRequestBuilder<ReleaseUpdateWorker>(12, TimeUnit.HOURS)
+            .setConstraints(constraints)
+            .build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "vpn-ai-release-update-check",
+            ExistingPeriodicWorkPolicy.KEEP,
+            periodic
+        )
+        val immediate = OneTimeWorkRequestBuilder<ReleaseUpdateWorker>()
+            .setConstraints(constraints)
+            .build()
+        WorkManager.getInstance(this).enqueue(immediate)
+    }
+
+    private fun installDownloadedUpdate() {
+        val prefs = getSharedPreferences(ReleaseUpdateWorker.PREFS, MODE_PRIVATE)
+        val path = prefs.getString(ReleaseUpdateWorker.PENDING_APK, null) ?: return
+        val apk = File(path)
+        if (!apk.isFile || apk.length() == 0L) {
+            prefs.edit().remove(ReleaseUpdateWorker.PENDING_APK).apply()
+            Toast.makeText(this, "فایل به‌روزرسانی معتبر نیست", Toast.LENGTH_LONG).show()
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
+            startActivity(Intent(
+                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                Uri.parse("package:$packageName")
+            ))
+            Toast.makeText(this, "برای نصب به‌روزرسانی، اجازه نصب برای VPN AI را فعال کنید", Toast.LENGTH_LONG).show()
+            return
+        }
+        try {
+            val uri = FileProvider.getUriForFile(this, "$packageName.updates", apk)
+            val install = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            prefs.edit().remove(ReleaseUpdateWorker.PENDING_APK).apply()
+            startActivity(install)
+        } catch (error: Exception) {
+            Toast.makeText(this, "باز کردن نصب‌کننده ناموفق بود: ${error.javaClass.simpleName}", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun buildScreen() {
