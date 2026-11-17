@@ -43,7 +43,7 @@ On the trusted Ubuntu VPS or another trusted Linux host, after cloning this repo
 bash tools/bootstrap-android-signing.sh
 ```
 
-The script generates a single RSA release keystore locally, creates an AES-256 encrypted offline backup at `$HOME/vpn-ai-release-keystore.jks.enc`, and sends the four signing values to GitHub Actions Secrets plus the certificate fingerprint to the repository Actions variable using GitHub CLI standard input. It does not print signing passwords or place the plaintext keystore in the repository. It requires `gh`, `keytool`, `openssl`, and an authenticated GitHub CLI session with permission to manage repository Actions secrets and variables.
+The script generates a single RSA release keystore locally, creates an AES-256 encrypted offline recovery bundle at `$HOME/vpn-ai-release-keystore.jks.enc` containing the Keystore and a private credential record, and sends the four signing values to GitHub Actions Secrets plus the certificate fingerprint to the repository Actions variable using GitHub CLI standard input. It does not print signing passwords or place the plaintext keystore in the repository. It requires `gh`, `keytool`, `openssl`, and an authenticated GitHub CLI session with permission to manage repository Actions secrets and variables.
 
 Keep the backup encryption passphrase separately from the backup file. Store a second copy of the encrypted backup in a separate secure location. Never regenerate the signing key for an existing application identity. If the backup or its passphrase is lost, future updates signed with that identity may become impossible.
 
