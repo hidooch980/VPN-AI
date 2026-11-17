@@ -46,10 +46,11 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_SIGNING_CERT_SHA256: ${{ vars.ANDROID_SIGNING_CERT_SHA256 }}
           ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/vpn-ai-release-signing.jks
         run: |
           set -euo pipefail
-          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD ANDROID_SIGNING_CERT_SHA256; do
             if [[ -z "${!name}" ]]; then
               echo "::error::Required signing secret is missing: $name"
               exit 1
@@ -66,7 +67,14 @@ jobs:
             -keystore "$ANDROID_KEYSTORE_FILE" \
             -storepass:env ANDROID_KEYSTORE_PASSWORD \
             -alias "$ANDROID_KEY_ALIAS" > "$RUNNER_TEMP/release-certificate.pem"
-          openssl x509 -in "$RUNNER_TEMP/release-certificate.pem" -noout -fingerprint -sha256 -dates
+          ACTUAL_FP="$(openssl x509 -in "$RUNNER_TEMP/release-certificate.pem" -noout -fingerprint -sha256 | cut -d= -f2 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          EXPECTED_FP="$(printf '%s' "$ANDROID_SIGNING_CERT_SHA256" | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          if [[ "$ACTUAL_FP" != "$EXPECTED_FP" ]]; then
+            echo "::error::Release signing certificate fingerprint does not match the pinned permanent identity."
+            exit 1
+          fi
+          echo "Pinned signing identity SHA-256: $ACTUAL_FP"
+          openssl x509 -in "$RUNNER_TEMP/release-certificate.pem" -noout -dates
           openssl x509 -in "$RUNNER_TEMP/release-certificate.pem" -noout -checkend 0
           NOT_BEFORE="$(openssl x509 -in "$RUNNER_TEMP/release-certificate.pem" -noout -startdate | cut -d= -f2-)"
           if (( "$(date -u -d "$NOT_BEFORE" +%s)" > "$(date -u +%s)" )); then
@@ -127,10 +135,12 @@ jobs:
                   exit 1
                 fi
               else
-                echo "Previous release $TAG has no APK asset; certificate continuity comparison unavailable." | tee app/build/outputs/apk/release/PREVIOUS-CERTIFICATE-COMPARISON.txt
+                echo "::error::Previous release $TAG has no APK asset; refusing to publish without certificate continuity proof."
+              exit 1
               fi
             else
-              echo "Previous release $TAG has no downloadable APK asset; certificate continuity comparison unavailable." | tee app/build/outputs/apk/release/PREVIOUS-CERTIFICATE-COMPARISON.txt
+              echo "::error::Previous release $TAG has no downloadable APK asset; refusing to publish without certificate continuity proof."
+              exit 1
             fi
           fi
 
