@@ -22,7 +22,7 @@ jobs:
       - name: Validate explicit confirmation
         shell: bash
         env:
-          CONFIRMATION: ${{ inputs.confirmation }}
+          CONFIRMATION: \${{ inputs.confirmation }}
         run: |
           set -euo pipefail
           if [[ "$CONFIRMATION" != "IMPORT_CLEAN_SNAPSHOT" ]]; then
@@ -57,10 +57,7 @@ jobs:
           set -euo pipefail
           go install github.com/zricethezav/gitleaks/v8@v8.24.2
           "$(go env GOPATH)/bin/gitleaks" dir --redact --exit-code 1 ../source
-          if find ../source -path ../source/.git -prune -o -type f \\
-            \\( -name '*.jks' -o -name '*.keystore' -o -name '*.p12' -o \\
-               -name '*.apk' -o -name '*.aab' -o -name '.env' -o -name '.env.*' -o \\
-               -name '*.pem' -o -name 'local.properties' \\) -print -quit | grep -q .; then
+          if find ../source -path ../source/.git -prune -o -type f \( -name '*.jks' -o -name '*.keystore' -o -name '*.p12' -o -name '*.apk' -o -name '*.aab' -o -name '.env' -o -name '.env.*' -o -name '*.pem' -o -name 'local.properties' \) -print -quit | grep -q .; then
             echo "::error::A signing, environment, certificate, or build artifact file was found."
             exit 1
           fi
@@ -73,9 +70,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -b clean-import/2026-11
-          rsync -a --delete --exclude='.git' \\
-            --exclude='.github/workflows/import-clean-snapshot.yml' \\
-            ../source/ ./
+          rsync -a --delete --exclude='.git' --exclude='.github/workflows/import-clean-snapshot.yml' ../source/ ./
           mkdir -p docs
           cat > docs/MIGRATION_PROVENANCE.md <<'EOF'
           # Clean source snapshot provenance
