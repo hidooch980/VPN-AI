@@ -16,15 +16,14 @@ val releaseTaskRequested = gradle.startParameter.taskNames.any {
 }
 if (releaseTaskRequested && !releaseSigningReady) {
     throw GradleException(
-        "Release signing is not configured. Provide ANDROID_KEYSTORE_FILE, " +
-            "ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD."
+        "Release signing is not configured. Required environment variables: " +
+            "ANDROID_KEYSTORE_FILE, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, ANDROID_KEY_PASSWORD."
     )
 }
 
 android {
     namespace = "ai.vpnai.client"
     compileSdk = 35
-
     defaultConfig {
         applicationId = "ai.vpnai.client"
         minSdk = 26
@@ -33,15 +32,12 @@ android {
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
-
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
         isCoreLibraryDesugaringEnabled = true
     }
-
     kotlinOptions { jvmTarget = "17" }
-
     signingConfigs {
         if (releaseSigningReady) {
             create("release") {
@@ -52,27 +48,16 @@ android {
             }
         }
     }
-
     buildTypes {
-        debug {
-            applicationIdSuffix = ".debug"
-            versionNameSuffix = "-debug"
-        }
+        debug { applicationIdSuffix = ".debug"; versionNameSuffix = "-debug" }
         release {
             isMinifyEnabled = true
-            if (releaseSigningReady) {
-                signingConfig = signingConfigs.getByName("release")
-            }
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            if (releaseSigningReady) signingConfig = signingConfigs.getByName("release")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
-
     testOptions { unitTests.isReturnDefaultValues = true }
 }
-
 dependencies {
     implementation("com.wireguard.android:tunnel:1.0.20260102")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
