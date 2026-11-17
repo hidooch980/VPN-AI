@@ -4,9 +4,9 @@ An independent Android-first VPN application project focused on secure, intellig
 
 ## Project status
 
-- **Development stage:** Foundation and first implementation
-- **Target:** VPN AI `v1.0.0 Stable` (signed)
-- **Release status:** No APK or release has been published
+- **Development stage:** Foundation implementation with automated update delivery
+- **Target:** VPN AI v1.0.x Stable (signed)
+- **Release status:** A stable release is published only after the persistent signing identity is available and the release verification gates pass
 - **Engine status:** No engine is yet verified on a physical device
 - **Production readiness:** Not established
 
@@ -20,6 +20,16 @@ An independent Android-first VPN application project focused on secure, intellig
 VPN AI is Android-first, AI-first, automation-first, and security-first. It is designed to evaluate measured network conditions, select eligible connection paths, recover safely from failures, and improve decisions from verified outcomes.
 
 AI may optimize decisions; deterministic lifecycle and security controls remain authoritative. No country, endpoint, latency, throughput, availability, or success rate may be fabricated.
+
+## Automated release and updates
+
+- Each successful signed-release workflow run receives a monotonically increasing Android versionCode and a 1.0.x version name.
+- The release workflow publishes a versioned GitHub Release with the APK, certificate details, and SHA-256 record.
+- The app checks the latest GitHub Release on launch and periodically (every 12 hours).
+- The updater downloads a newer APK only when a SHA-256 digest is available from GitHub release-asset metadata and verifies the downloaded bytes before presenting the installer.
+- Android Package Manager validates signing-certificate continuity during installation. A different signing certificate cannot update an existing installation with the same application ID.
+- Ordinary Android apps cannot silently install APK updates. Android requires the user to grant per-app install permission where applicable and approve each package installation in the system installer.
+- A persistent private signing key must be held in an external protected secret store and made available only to the authorized release workflow. It must never be committed to the repository or embedded in the APK.
 
 ## Engineering and release rules
 
@@ -35,4 +45,3 @@ AI may optimize decisions; deterministic lifecycle and security controls remain 
 ## Current implementation
 
 The repository is being built incrementally. A code file or successful compilation is not proof of a working VPN connection. Real tunnel behavior must be demonstrated on supported physical Android devices before any stable-release claim.
-
