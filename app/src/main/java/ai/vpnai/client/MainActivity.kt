@@ -83,10 +83,10 @@ class MainActivity : Activity() {
             return
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !packageManager.canRequestPackageInstalls()) {
-            startActivity(Intent(
+            startActivityForResult(Intent(
                 Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                 Uri.parse("package:$packageName")
-            ))
+            ), REQUEST_INSTALL_PERMISSION)
             Toast.makeText(this, "برای نصب به‌روزرسانی، اجازه نصب برای VPN AI را فعال کنید", Toast.LENGTH_LONG).show()
             return
         }
@@ -155,7 +155,13 @@ class MainActivity : Activity() {
     @Deprecated("Uses the platform activity result contract for broad Android compatibility.")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQUEST_PROFILE && resultCode == RESULT_OK) {
+        if (requestCode == REQUEST_INSTALL_PERMISSION) {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || packageManager.canRequestPackageInstalls()) {
+                installDownloadedUpdate()
+            } else {
+                Toast.makeText(this, "مجوز نصب به‌روزرسانی فعال نشد", Toast.LENGTH_LONG).show()
+            }
+        } else if (requestCode == REQUEST_PROFILE && resultCode == RESULT_OK) {
             val uri = data?.data ?: return
             try {
                 val output = ByteArrayOutputStream()
@@ -208,5 +214,6 @@ class MainActivity : Activity() {
     companion object {
         private const val REQUEST_PROFILE = 1001
         private const val REQUEST_VPN_CONSENT = 1002
+        private const val REQUEST_INSTALL_PERMISSION = 1003
     }
 }
