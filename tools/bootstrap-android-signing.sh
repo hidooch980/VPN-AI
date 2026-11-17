@@ -28,13 +28,13 @@ KEY_PASS="$(openssl rand -hex 32)"
 read -r -p "Key alias [$ALIAS]: " ENTERED_ALIAS
 if [[ -n "$ENTERED_ALIAS" ]]; then ALIAS="$ENTERED_ALIAS"; fi
 
-keytool -genkeypair -noprompt -v \
+STORE_PASS="$STORE_PASS" KEY_PASS="$KEY_PASS" keytool -genkeypair -noprompt -v \
   -keystore "$KEYSTORE" -storetype JKS \
-  -storepass "$STORE_PASS" -keypass "$KEY_PASS" \
+  -storepass:env STORE_PASS -keypass:env KEY_PASS \
   -alias "$ALIAS" -keyalg RSA -keysize 4096 -validity 10000 \
   -dname "CN=VPN AI Android Release, OU=Mobile, O=VPN AI, C=US"
 
-CERT_FP="$(keytool -exportcert -rfc -keystore "$KEYSTORE" -storepass "$STORE_PASS" -alias "$ALIAS" | openssl x509 -noout -fingerprint -sha256 | cut -d= -f2 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+CERT_FP="$(STORE_PASS="$STORE_PASS" keytool -exportcert -rfc -keystore "$KEYSTORE" -storepass:env STORE_PASS -alias "$ALIAS" | openssl x509 -noout -fingerprint -sha256 | cut -d= -f2 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
 [[ "$(printf '%s' "$CERT_FP" | wc -c)" -eq 64 ]] || fail "Could not calculate a valid SHA-256 certificate fingerprint."
 
 printf '\nCreate a strong passphrase to encrypt the offline Keystore backup.\n'
