@@ -123,7 +123,7 @@ class ReleaseUpdateWorker(
         const val PENDING_APK = "pending_apk"
         const val PENDING_TAG = "pending_tag"
         private const val RELEASE_API = "https://api.github.com/repos/hidooch980/VPN-AI/releases/latest"
-        private const val APK_NAME = "vpn-ai-release.apk"
+        private const val APK_NAME = "app-release.apk"
         private const val CHANNEL = "vpn_ai_updates"
         private const val NOTIFICATION_ID = 4102
     }
