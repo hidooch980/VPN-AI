@@ -59,6 +59,8 @@ jobs:
           mkdir -p ../source-scan
           rsync -a --exclude=.git ../source/ ../source-scan/
           "$(go env GOPATH)/bin/gitleaks" dir --redact --exit-code 1 ../source-scan
+          SOURCE_FILE_COUNT="$(find ../source-scan -type f | wc -l | tr -d ' ')"
+          test "$SOURCE_FILE_COUNT" = "96" || { echo "::error::Expected 96 files in pinned source snapshot, found $SOURCE_FILE_COUNT"; exit 1; }
           if find ../source-scan -type f \( -name '*.jks' -o -name '*.keystore' -o -name '*.p12' -o -name '*.apk' -o -name '*.aab' -o -name '.env' -o -name '.env.*' -o -name '*.pem' -o -name 'local.properties' \) -print -quit | grep -q .; then
             echo "::error::A signing, environment, certificate, or build artifact file was found."
             exit 1
@@ -80,7 +82,9 @@ jobs:
           - Source repository: https://github.com/hidooch980/Molido-vpn
           - Source commit: bc99183197e6929194acbf42fa4acb36b597740c
           - Import method: source snapshot; source Git history is not copied.
-          - Import gate: Gitleaks filesystem scan and forbidden artifact filename check.
+          - Expected source file count: 96; import aborts if the count differs.
+          - Import gate: Gitleaks v8.24.2 filesystem scan and forbidden artifact filename check.
+          - Manual preflight: 95 text files were checked for common credential/key patterns; no confirmed secret was identified. The Gradle wrapper JAR is binary and is covered by the automated scan.
           - This file does not certify physical VPN acceptance, release signing, or production readiness.
           EOF
           git add -A
