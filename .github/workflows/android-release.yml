@@ -100,7 +100,15 @@ jobs:
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
           test -x "$APKSIGNER"
           "$APKSIGNER" verify --verbose --print-certs "$APK" | tee app/build/outputs/apk/release/APK-CERTIFICATE.txt
-          grep -E "Signer #1 certificate SHA-256 digest:" app/build/outputs/apk/release/APK-CERTIFICATE.txt
+          grep -F "Verified using v2 scheme (APK Signature Scheme v2): true" app/build/outputs/apk/release/APK-CERTIFICATE.txt
+          grep -F "Number of signers: 1" app/build/outputs/apk/release/APK-CERTIFICATE.txt
+          ACTUAL_FP="$(sed -n 's/.*V2 Signer: certificate SHA-256 digest: //p' app/build/outputs/apk/release/APK-CERTIFICATE.txt | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          EXPECTED_FP="$(printf '%s' "${{ vars.ANDROID_SIGNING_CERT_SHA256 }}" | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+          if [[ -z "$ACTUAL_FP" || "$ACTUAL_FP" != "$EXPECTED_FP" ]]; then
+            echo "::error::APK signer fingerprint does not match the pinned permanent signing identity."
+            exit 1
+          fi
+          echo "Verified APK signing identity SHA-256: $ACTUAL_FP"
           sha256sum "$APK" | tee app/build/outputs/apk/release/SHA256SUMS.txt
 
       - name: Compare certificate with previous published APK when available
