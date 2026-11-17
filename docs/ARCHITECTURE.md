@@ -1,131 +1,97 @@
-# VPN AI — Initial Architecture
+# VPN AI — Architecture
 
-**Status:** Proposed baseline; subject to product-scope confirmation.  
-**Platform assumption:** Android-first, because the reference project is an Android VPN client. Other platforms are not committed.
+**Status:** Initial implementation baseline  
+**Platform:** Android  
+**Release target:** `v1.0.0 Stable`
 
-## 1. Architectural rules
+## 1. Non-negotiable invariants
 
-1. **Single TUN owner:** exactly one component owns the active Android `VpnService` interface and its file descriptor for a session.
-2. **Explicit engine lifecycle:** every adapter exposes start, health, stop, and capability reporting. Start/stop must be idempotent or guarded by a session state machine.
-3. **No false readiness:** a successful configuration parse or transport handshake is not proof that application traffic passes.
-4. **Fail closed where security matters:** invalid profiles, unverifiable updates, and integrity failures cannot be silently accepted.
-5. **Measured network intelligence:** latency, MTU, packet loss, throughput, and server metadata must include source, timestamp, and validity.
-6. **Platform separation:** Android-specific VPN APIs remain in the Android layer; shared session logic must be testable without Android framework dependencies.
-7. **No premature multi-engine orchestration:** first prove one engine end-to-end, then add other engines behind the same contract.
+1. One authoritative VPN backend owns the active Android TUN interface and descriptor for each session.
+2. All lifecycle operations are serialized; a new session cannot race cleanup from an older session.
+3. The UI never infers connectivity from a running process or successful configuration parse.
+4. AI may rank or recommend; deterministic safety gates decide whether an action is permitted.
+5. Endpoint measurements carry source, timestamp, sample count, and validity.
+6. Invalid profiles, untrusted updates, and integrity failures fail closed.
+7. Platform-specific APIs stay behind Android adapters.
 
-## 2. Proposed layers
+## 2. Runtime layers
 
-### Android application layer
-- UI, onboarding, settings, profile import, connection controls.
-- Localization and accessibility.
-- No direct ownership of native engine threads or raw TUN descriptor lifecycle.
+### Android application
+- Onboarding, profile import, settings, connection controls, diagnostics, and localization.
+- No direct ownership of native tunnel threads or TUN descriptors.
 
-### VPN service and TUN layer
-- Owns `VpnService.Builder`, `establish()`, descriptor transfer, and revocation.
-- Enforces one active TUN owner.
-- Applies routes, allowed/disallowed applications, and DNS configuration from a validated session plan.
-- Coordinates lockdown expectations with Android's Always-on VPN settings; the app must not claim it can enable OS lockdown by itself.
+### VPN backend and TUN owner
+- A single selected backend owns VPN establishment, descriptor transfer, packet forwarding, and teardown.
+- The first engine is WireGuard using the official Android embeddable tunnel library.
+- Do not add a second competing `VpnService` implementation while this backend owns the TUN.
 
 ### Session supervisor
-- Serializes connect, reconnect, pause, resume, and disconnect.
-- Uses explicit states such as Idle, Preparing, Connecting, Online, Degraded, Stopping, and Failed.
-- Prevents a new session from racing old-session cleanup.
-- Stops packet forwarding before stopping the backend, then releases descriptors and restores platform state.
-- Applies bounded timeouts and a cleanup/reaper strategy for stuck native workers.
+- Serializes connect, reconnect, failover, and disconnect.
+- Models Idle, Preparing, Connecting, Online, Degraded, Stopping, and Failed.
+- Stops forwarding before backend shutdown and releases resources in a deterministic order.
+- Uses bounded timeouts and explicit error states.
 
-### Engine adapter contract
-Each engine adapter should provide:
-- Stable engine identifier and version.
-- Supported platform/ABI and capability declaration.
-- Configuration validation.
-- Start result with concrete endpoint/session metadata.
-- Health check that distinguishes transport reachability from data-plane success.
-- Stop/abort semantics and resource ownership.
-- Structured error codes and telemetry.
-
-An engine is selectable only when its adapter, native runtime, license, configuration validation, and device test matrix are complete.
+### Engine adapter
+Every engine integration must expose identity/version, supported ABIs, profile validation, start, health, stop/abort, structured errors, and telemetry. An engine is selectable only after license, security, compatibility, lifecycle, and physical-device gates pass.
 
 ### Network intelligence
-- Connectivity changes and active-network identity.
-- MTU discovery with platform-aware probes and conservative fallback.
-- Latency and packet-loss measurements with timestamps and sample counts.
-- Server selection based on real measurements, not hard-coded or fabricated values.
-- Hysteresis/cooldowns to prevent rapid route or server oscillation.
+- Uses Android network callbacks and measured latency, loss, throughput, handshake, and data-plane outcomes.
+- Keeps endpoint inventory separate from observed health.
+- Applies freshness, minimum sample counts, confidence, hysteresis, and cooldowns.
+- Never invents server locations or measurements.
 
-### DNS and leak protection
-- Explicit DNS policy and resolver ownership.
-- IPv4 and IPv6 route coverage checked independently.
-- DNS behavior tested during connect, reconnect, network handoff, and disconnect.
-- Detect unsupported per-app/system-wide claims and disclose limitations.
-- Do not equate configuring a DNS address with proving leak protection.
+### DNS and IP protection
+- Validates DNS behavior and IPv4/IPv6 route coverage independently.
+- Tests connect, reconnect, network handoff, disconnect, and failure conditions.
+- Distinguishes app-level controls from Android Always-on VPN and lockdown settings.
+- Does not claim leak protection from configuration alone.
 
 ### Security and update manager
-- Parse profiles as untrusted input with strict size, scheme, host, and field validation.
-- Keep credentials and private keys out of logs and analytics.
-- Signed update manifest with pinned verification key, artifact digest, version/rollback policy, ABI and OS compatibility checks.
-- Stage updates atomically and retain a known-good rollback path.
-- Subscription refresh and application/engine binary updates are separate workflows.
+- Treats imported profiles as untrusted; limits size and validates syntax before activation.
+- Redacts private keys, tokens, and profile contents from logs.
+- Verifies signed manifests, artifact digests, compatibility, and anti-rollback policy.
+- Stages updates atomically and retains a known-good rollback path.
 
-### Diagnostics and telemetry
-- Structured state transitions and error codes.
-- Counters for packets/bytes, reconnects, uptime, and last successful data-plane probe.
-- Avoid reporting Online solely because a process or socket exists.
-- Redact secrets, profile contents, and identifying data.
+## 3. WireGuard integration boundary
 
-## 3. Session state machine
+The first engine uses the official `com.wireguard.android:tunnel` library and its userspace backend. The library-provided `GoBackend.VpnService` is the sole TUN owner for this engine. The application must request Android VPN consent before bringing a tunnel up.
+
+A WireGuard profile must be supplied by the user or an authorized service. No server, peer key, endpoint, DNS resolver, or location is bundled or fabricated. Private profile material must not be logged or sent to analytics.
+
+## 4. Session state model
 
 ```text
-Idle
-  -> Preparing
-  -> Connecting
-  -> Online <-> Degraded
-  -> Stopping
-  -> Idle
-
-Preparing/Connecting -> Failed -> Stopping -> Idle
-Online/Degraded -> Stopping -> Idle
+Idle -> Preparing -> Connecting -> Online <-> Degraded
+                         |             |
+                         v             v
+                       Failed       Stopping
+                         |             |
+                         +----------> Idle
 ```
 
-All transitions are serialized. Disconnect is always permitted. A reconnect cannot begin until prior cleanup has completed or a bounded recovery path has explicitly taken ownership of remaining resources.
+Disconnect is always permitted. Failover cannot start a replacement tunnel until the prior backend has safely stopped or a documented recovery path has taken ownership.
 
-## 4. MTU discovery requirements
+## 5. MTU and diagnostics
 
-The reference scanner is useful as a design prompt, not as a drop-in implementation. The VPN AI implementation must:
-- Detect whether the platform exposes a supported probe mechanism.
-- Avoid depending on Linux-only ping flags on Android.
-- Use multiple probe sizes and bounded timeouts.
-- Distinguish “probe unsupported/blocked” from “path MTU measured”.
-- Never manufacture a successful minimum MTU when all probes fail.
-- Account for actual encapsulation overhead per selected transport and address family.
-- Apply conservative defaults only when explicitly labelled as defaults, not measurements.
-- Record the measurement method, timestamp, network identity, and confidence.
+- Use Android-supported measurement methods.
+- Distinguish unsupported/blocked probes from measured values.
+- Never report a fallback as a measurement.
+- Account for protocol and address-family overhead.
+- Record method, network context, timestamp, and confidence.
 
-## 5. Delivery sequence
+## 6. Delivery gates
 
-### Phase A — requirements and threat model
-Confirm Android versions, ABI targets, protocols, server/profile sources, privacy model, update distribution, and release signing ownership.
+1. Android foundation and CI.
+2. Single-owner lifecycle and deterministic tests.
+3. First WireGuard engine and real data-plane validation.
+4. DNS, IPv4/IPv6, Kill Switch evaluation, and recovery tests.
+5. Measured network intelligence and explainable selection.
+6. Bounded failover and reconnect.
+7. Additional engines, one at a time.
+8. Learning with deterministic fallback.
+9. Signed updates and rollback.
+10. Physical-device field validation and signed stable release.
 
-### Phase B — foundation
-Create app shell, service boundary, session state machine, engine contract, structured telemetry, and automated tests.
+## 7. Definition of done
 
-### Phase C — first engine
-Choose one protocol based on requirements and licensing. Complete connect/data-plane/disconnect and failure recovery on physical Android devices.
-
-### Phase D — protection and intelligence
-Add DNS/IPv4/IPv6 tests, MTU diagnostics, network handoff, health scoring, and server selection using real observations.
-
-### Phase E — additional engines
-Add engines one at a time. Each must pass the same lifecycle and security gates.
-
-### Phase F — updates and release
-Complete signing-key custody, reproducible build checks, signed update verification, rollback, privacy review, and release test matrix.
-
-## 6. Definition of done
-
-A feature is not complete because it compiles. It must have:
-- A documented contract and failure behavior.
-- Unit tests for deterministic logic.
-- Instrumentation tests where Android framework behavior is involved.
-- Device evidence for real VPN data-plane behavior.
-- Security and privacy review where secrets, routes, DNS, or updates are involved.
-- Telemetry that reports the actual state.
+Compilation alone is insufficient. Each feature needs documented behavior, deterministic tests, Android instrumentation where applicable, physical-device evidence for VPN behavior, and security/privacy review where secrets, routes, DNS, or updates are involved.
