@@ -22,7 +22,7 @@ jobs:
       - name: Validate explicit confirmation
         shell: bash
         env:
-          CONFIRMATION: \${{ inputs.confirmation }}
+          CONFIRMATION: ${{ inputs.confirmation }}
         run: |
           set -euo pipefail
           if [[ "$CONFIRMATION" != "IMPORT_CLEAN_SNAPSHOT" ]]; then
