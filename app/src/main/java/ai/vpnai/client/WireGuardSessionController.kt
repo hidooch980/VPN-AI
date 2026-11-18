@@ -5,12 +5,16 @@ import com.wireguard.android.backend.GoBackend
 import com.wireguard.android.backend.Tunnel
 import com.wireguard.config.Config
 import java.io.ByteArrayInputStream
+import android.os.SystemClock
+import com.wireguard.android.backend.Statistics
 import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.Executors
 
 /** Sole application entry point for WireGuard lifecycle operations. */
 internal object WireGuardSessionController {
     private val lifecycle = Executors.newSingleThreadExecutor()
+    private const val DATA_PLANE_POLL_MS = 500L
+    private const val DATA_PLANE_VERIFY_TIMEOUT_MS = 10_000L
     private val listeners = CopyOnWriteArraySet<(String) -> Unit>()
     private val stateMachine = ConnectionStateMachine()
 
@@ -60,7 +64,7 @@ internal object WireGuardSessionController {
                 if (state == Tunnel.State.UP) {
                     transition(ConnectionEvent.BACKEND_READY)
                     transition(ConnectionEvent.VERIFY_DATA_PLANE)
-                    publish("تونل WireGuard بالا است؛ تا تأیید عبور واقعی داده آنلاین محسوب نمی‌شود")
+                    verifyWireGuardTraffic(engine)
                 } else {
                     transition(ConnectionEvent.FAILURE)
                     publish("موتور اتصال را فعال نکرد")
@@ -96,6 +100,34 @@ internal object WireGuardSessionController {
                 failSession()
                 publish("خطا هنگام قطع اتصال: ${error.javaClass.simpleName}")
             }
+        }
+    }
+
+    /** MSN-GUARD-style verified-connect gate: backend UP is not enough. */
+    private fun verifyWireGuardTraffic(engine: GoBackend) {
+        publish("تونل WireGuard بالا است؛ در حال بررسی عبور واقعی داده…")
+        val baseline = runCatching { engine.getStatistics(tunnel) }.getOrNull()
+        val baselineTx = baseline?.totalTx() ?: 0L
+        val baselineRx = baseline?.totalRx() ?: 0L
+        val deadline = SystemClock.elapsedRealtime() + DATA_PLANE_VERIFY_TIMEOUT_MS
+        var verified = false
+        while (SystemClock.elapsedRealtime() < deadline) {
+            Thread.sleep(DATA_PLANE_POLL_MS)
+            if (engine.getState(tunnel) != Tunnel.State.UP) break
+            val stats: Statistics = runCatching { engine.getStatistics(tunnel) }.getOrElse {
+                continue
+            }
+            if (stats.totalTx() > baselineTx && stats.totalRx() > baselineRx) {
+                verified = true
+                transition(ConnectionEvent.DATA_PLANE_VERIFIED)
+                publish("اتصال WireGuard تأیید شد؛ عبور واقعی داده برقرار است")
+                break
+            }
+        }
+        if (!verified) {
+            runCatching { ensureBackendDown() }
+            transition(ConnectionEvent.FAILURE)
+            publish("WireGuard بالا آمد اما عبور واقعی داده تأیید نشد")
         }
     }
 
