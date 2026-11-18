@@ -112,7 +112,15 @@ internal object WireGuardSessionController {
         val deadline = SystemClock.elapsedRealtime() + DATA_PLANE_VERIFY_TIMEOUT_MS
         var verified = false
         while (SystemClock.elapsedRealtime() < deadline) {
-            Thread.sleep(DATA_PLANE_POLL_MS)
+            try {
+                Thread.sleep(DATA_PLANE_POLL_MS)
+            } catch (interrupted: InterruptedException) {
+                Thread.currentThread().interrupt()
+                runCatching { ensureBackendDown() }
+                transition(ConnectionEvent.FAILURE)
+                publish("آزمون عبور داده متوقف شد")
+                return
+            }
             if (engine.getState(tunnel) != Tunnel.State.UP) break
             val stats: Statistics = runCatching { engine.getStatistics(tunnel) }.getOrElse {
                 continue
