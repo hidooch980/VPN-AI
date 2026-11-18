@@ -122,7 +122,9 @@ internal object WireGuardSessionController {
                 return
             }
             if (engine.getState(tunnel) != Tunnel.State.UP) break
-            val stats: Statistics = runCatching { engine.getStatistics(tunnel) }.getOrElse {
+            val stats: Statistics = try {
+                engine.getStatistics(tunnel)
+            } catch (_: Exception) {
                 continue
             }
             if (stats.totalTx() > baselineTx && stats.totalRx() > baselineRx) {
