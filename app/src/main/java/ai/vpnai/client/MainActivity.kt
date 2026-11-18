@@ -46,8 +46,9 @@ class MainActivity : Activity() {
         runOnUiThread {
             if (::statusView.isInitialized) {
                 statusView.text = state
-                val up = state.contains("بالا") || state.contains("UP", ignoreCase = true)
-                statusView.setTextColor(if (up) CYAN else MUTED)
+                // Backend UP is not equivalent to verified internet/data-plane connectivity.
+                val verified = WireGuardSessionController.connectionState == ConnectionState.ONLINE
+                statusView.setTextColor(if (verified) CYAN else WARNING)
             }
         }
     }
