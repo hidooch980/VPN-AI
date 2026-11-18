@@ -29,7 +29,7 @@ internal class WireGuardDataPlaneProbe(context: Context) {
             connection.useCaches = false
             connection.setRequestProperty("Cache-Control", "no-cache, no-store")
             connection.setRequestProperty("Pragma", "no-cache")
-            connection.responseCode == EXPECTED_STATUS
+            acceptsStatus(connection.responseCode)
         } catch (_: Exception) {
             false
         } finally {
