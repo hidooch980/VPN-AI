@@ -37,6 +37,7 @@ internal object WireGuardSessionController {
 
     fun connect(context: Context, profile: ByteArray) {
         lifecycle.execute {
+            var backendStartAttempted = false
             try {
                 if (stateMachine.state == ConnectionState.FAILED) {
                     // Never reset the logical session until the backend confirms the old
@@ -44,8 +45,9 @@ internal object WireGuardSessionController {
                     ensureBackendDown()
                     transition(ConnectionEvent.RESET)
                 }
-                check(stateMachine.state == ConnectionState.IDLE) {
-                    "A VPN session is already active or transitioning"
+                if (stateMachine.state != ConnectionState.IDLE) {
+                    publish("A VPN session is already active or transitioning")
+                    return@execute
                 }
                 transition(ConnectionEvent.PREPARE)
                 publish("در حال اعتبارسنجی پروفایل…")
@@ -53,6 +55,7 @@ internal object WireGuardSessionController {
                 val parsed = Config.parse(ByteArrayInputStream(profile))
                 val engine = backend ?: GoBackend(context.applicationContext).also { backend = it }
                 publish("پروفایل معتبر است؛ راه‌اندازی موتور WireGuard…")
+                backendStartAttempted = true
                 val state = engine.setState(tunnel, Tunnel.State.UP, parsed)
                 if (state == Tunnel.State.UP) {
                     transition(ConnectionEvent.BACKEND_READY)
@@ -65,7 +68,9 @@ internal object WireGuardSessionController {
             } catch (error: Exception) {
                 // setState(UP) can fail after partial native setup. Attempt teardown before
                 // exposing FAILED, and keep the next connect blocked until DOWN is confirmed.
-                runCatching { ensureBackendDown() }
+                if (backendStartAttempted) {
+                    runCatching { ensureBackendDown() }
+                }
                 failSession()
                 publish("اتصال ناموفق: ${error.javaClass.simpleName}")
             } finally {
