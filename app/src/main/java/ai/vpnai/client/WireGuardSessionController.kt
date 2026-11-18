@@ -6,7 +6,6 @@ import com.wireguard.android.backend.Tunnel
 import com.wireguard.config.Config
 import java.io.ByteArrayInputStream
 import android.os.SystemClock
-import com.wireguard.android.backend.Statistics
 import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.Executors
 
