@@ -6,7 +6,6 @@ import com.wireguard.android.backend.Tunnel
 import com.wireguard.config.Config
 import java.io.ByteArrayInputStream
 import android.os.SystemClock
-import com.wireguard.android.backend.Statistics
 import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.Executors
 
@@ -64,7 +63,7 @@ internal object WireGuardSessionController {
                 if (state == Tunnel.State.UP) {
                     transition(ConnectionEvent.BACKEND_READY)
                     transition(ConnectionEvent.VERIFY_DATA_PLANE)
-                    verifyWireGuardTraffic(engine)
+                    verifyWireGuardTraffic(engine, context)
                 } else {
                     val teardown = runCatching { ensureBackendDown() }
                     transition(ConnectionEvent.FAILURE)
@@ -108,7 +107,7 @@ internal object WireGuardSessionController {
     }
 
     /** MSN-GUARD-style verified-connect gate: backend UP is not enough. */
-    private fun verifyWireGuardTraffic(engine: GoBackend) {
+    private fun verifyWireGuardTraffic(engine: GoBackend, context: Context) {
         publish("تونل WireGuard بالا است؛ در حال بررسی عبور واقعی داده…")
         val baseline = try {
             engine.getStatistics(tunnel)
@@ -124,6 +123,7 @@ internal object WireGuardSessionController {
         val baselineTx = baseline.totalTx()
         val baselineRx = baseline.totalRx()
         val deadline = SystemClock.elapsedRealtime() + DATA_PLANE_VERIFY_TIMEOUT_MS
+        val dataPlaneProbe = WireGuardDataPlaneProbe(context)
         var verified = false
         while (SystemClock.elapsedRealtime() < deadline) {
             try {
@@ -136,16 +136,23 @@ internal object WireGuardSessionController {
                 return
             }
             if (engine.getState(tunnel) != Tunnel.State.UP) break
-            val stats: Statistics = try {
-                engine.getStatistics(tunnel)
-            } catch (_: Exception) {
-                continue
-            }
-            if (stats.totalTx() > baselineTx && stats.totalRx() > baselineRx) {
-                verified = true
-                transition(ConnectionEvent.DATA_PLANE_VERIFIED)
-                publish("اتصال WireGuard تأیید شد؛ عبور واقعی داده برقرار است")
-                break
+            // A controlled HTTPS request is explicitly opened on Android's active
+            // VPN Network. Counter growth alone is not accepted as end-to-end proof.
+            val probeSucceeded = dataPlaneProbe.verify()
+            if (probeSucceeded) {
+                val afterProbe = try {
+                    engine.getStatistics(tunnel)
+                } catch (_: Exception) {
+                    continue
+                }
+                if (afterProbe.totalTx() > baselineTx &&
+                    afterProbe.totalRx() > baselineRx
+                ) {
+                    verified = true
+                    transition(ConnectionEvent.DATA_PLANE_VERIFIED)
+                    publish("اتصال WireGuard تأیید شد؛ آزمون HTTPS داخل تونل موفق بود")
+                    break
+                }
             }
         }
         if (!verified) {

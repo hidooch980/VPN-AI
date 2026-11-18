@@ -47,6 +47,49 @@ class ConnectionStateMachineTest {
         assertEquals(ConnectionState.IDLE, machine.dispatch(ConnectionEvent.RESET))
     }
 
+    @Test fun disconnectDuringPreparationMovesToStopping() {
+        val machine = ConnectionStateMachine()
+        machine.dispatch(ConnectionEvent.PREPARE)
+        assertEquals(ConnectionState.STOPPING, machine.dispatch(ConnectionEvent.STOP))
+        assertEquals(ConnectionState.IDLE, machine.dispatch(ConnectionEvent.STOPPED))
+    }
+
+    @Test fun disconnectDuringBackendConnectMovesToStopping() {
+        val machine = ConnectionStateMachine()
+        machine.dispatch(ConnectionEvent.PREPARE)
+        machine.dispatch(ConnectionEvent.BACKEND_READY)
+        assertEquals(ConnectionState.STOPPING, machine.dispatch(ConnectionEvent.STOP))
+        assertEquals(ConnectionState.IDLE, machine.dispatch(ConnectionEvent.STOPPED))
+    }
+
+    @Test fun disconnectDuringDataPlaneVerificationMovesToStopping() {
+        val machine = ConnectionStateMachine()
+        machine.dispatch(ConnectionEvent.PREPARE)
+        machine.dispatch(ConnectionEvent.BACKEND_READY)
+        machine.dispatch(ConnectionEvent.VERIFY_DATA_PLANE)
+        assertEquals(ConnectionState.STOPPING, machine.dispatch(ConnectionEvent.STOP))
+        assertEquals(ConnectionState.IDLE, machine.dispatch(ConnectionEvent.STOPPED))
+    }
+
+    @Test fun backendFailureFromOnlineNeverLeavesSessionOnline() {
+        val machine = ConnectionStateMachine()
+        machine.dispatch(ConnectionEvent.PREPARE)
+        machine.dispatch(ConnectionEvent.BACKEND_READY)
+        machine.dispatch(ConnectionEvent.VERIFY_DATA_PLANE)
+        machine.dispatch(ConnectionEvent.DATA_PLANE_VERIFIED)
+        assertEquals(ConnectionState.FAILED, machine.dispatch(ConnectionEvent.FAILURE))
+    }
+
+    @Test fun failedTeardownKeepsSessionFailedAndBlocksNewPrepare() {
+        val machine = ConnectionStateMachine()
+        machine.dispatch(ConnectionEvent.PREPARE)
+        assertEquals(ConnectionState.FAILED, machine.dispatch(ConnectionEvent.FAILURE))
+        assertThrows(IllegalStateException::class.java) {
+            machine.dispatch(ConnectionEvent.PREPARE)
+        }
+        assertEquals(ConnectionState.FAILED, machine.state)
+    }
+
     @Test fun verificationFailureLeavesSessionFailed() {
         val machine = ConnectionStateMachine()
         machine.dispatch(ConnectionEvent.PREPARE)
