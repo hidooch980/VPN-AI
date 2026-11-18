@@ -37,7 +37,7 @@ AI may optimize decisions; deterministic lifecycle and security controls remain 
 
 ### One-time signing bootstrap
 
-On the trusted Ubuntu VPS or another trusted Linux host, after cloning this repository and checking out `foundation/vpn-ai-start`, run:
+On the trusted Ubuntu VPS or another trusted Linux host, after cloning this repository and checking out `main`, run:
 
 ```bash
 bash tools/bootstrap-android-signing.sh
