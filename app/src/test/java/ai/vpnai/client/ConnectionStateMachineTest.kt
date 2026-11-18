@@ -46,4 +46,14 @@ class ConnectionStateMachineTest {
         assertEquals(ConnectionState.FAILED, machine.dispatch(ConnectionEvent.FAILURE))
         assertEquals(ConnectionState.IDLE, machine.dispatch(ConnectionEvent.RESET))
     }
+
+    @Test fun verificationFailureLeavesSessionFailed() {
+        val machine = ConnectionStateMachine()
+        machine.dispatch(ConnectionEvent.PREPARE)
+        machine.dispatch(ConnectionEvent.BACKEND_READY)
+        machine.dispatch(ConnectionEvent.VERIFY_DATA_PLANE)
+        assertEquals(ConnectionState.FAILED, machine.dispatch(ConnectionEvent.FAILURE))
+        assertEquals(ConnectionState.IDLE, machine.dispatch(ConnectionEvent.RESET))
+    }
 }
+
