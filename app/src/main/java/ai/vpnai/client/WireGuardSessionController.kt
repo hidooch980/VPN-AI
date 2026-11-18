@@ -39,6 +39,9 @@ internal object WireGuardSessionController {
         lifecycle.execute {
             try {
                 if (stateMachine.state == ConnectionState.FAILED) {
+                    // Never reset the logical session until the backend confirms the old
+                    // tunnel is down; otherwise a failed cleanup could overlap a new session.
+                    ensureBackendDown()
                     transition(ConnectionEvent.RESET)
                 }
                 check(stateMachine.state == ConnectionState.IDLE) {
@@ -60,6 +63,9 @@ internal object WireGuardSessionController {
                     publish("موتور اتصال را فعال نکرد")
                 }
             } catch (error: Exception) {
+                // setState(UP) can fail after partial native setup. Attempt teardown before
+                // exposing FAILED, and keep the next connect blocked until DOWN is confirmed.
+                runCatching { ensureBackendDown() }
                 failSession()
                 publish("اتصال ناموفق: ${error.javaClass.simpleName}")
             } finally {
@@ -85,6 +91,16 @@ internal object WireGuardSessionController {
                 failSession()
                 publish("خطا هنگام قطع اتصال: ${error.javaClass.simpleName}")
             }
+        }
+    }
+
+    private fun ensureBackendDown() {
+        val engine = backend ?: return
+        if (engine.getState(tunnel) == Tunnel.State.UP) {
+            engine.setState(tunnel, Tunnel.State.DOWN, null)
+        }
+        check(engine.getState(tunnel) == Tunnel.State.DOWN) {
+            "WireGuard backend did not confirm tunnel teardown"
         }
     }
 
