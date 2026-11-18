@@ -124,6 +124,7 @@ internal object WireGuardSessionController {
         val baselineTx = baseline.totalTx()
         val baselineRx = baseline.totalRx()
         val deadline = SystemClock.elapsedRealtime() + DATA_PLANE_VERIFY_TIMEOUT_MS
+        val dataPlaneProbe = WireGuardDataPlaneProbe(context)
         var verified = false
         while (SystemClock.elapsedRealtime() < deadline) {
             try {
@@ -136,14 +137,9 @@ internal object WireGuardSessionController {
                 return
             }
             if (engine.getState(tunnel) != Tunnel.State.UP) break
-            val stats: Statistics = try {
-                engine.getStatistics(tunnel)
-            } catch (_: Exception) {
-                continue
-            }
             // A controlled HTTPS request is explicitly opened on Android's active
             // VPN Network. Counter growth alone is not accepted as end-to-end proof.
-            val probeSucceeded = WireGuardDataPlaneProbe(context).verify()
+            val probeSucceeded = dataPlaneProbe.verify()
             if (probeSucceeded) {
                 val afterProbe = try {
                     engine.getStatistics(tunnel)
@@ -151,9 +147,7 @@ internal object WireGuardSessionController {
                     continue
                 }
                 if (afterProbe.totalTx() > baselineTx &&
-                    afterProbe.totalRx() > baselineRx &&
-                    stats.totalTx() >= baselineTx &&
-                    stats.totalRx() >= baselineRx
+                    afterProbe.totalRx() > baselineRx
                 ) {
                     verified = true
                     transition(ConnectionEvent.DATA_PLANE_VERIFIED)
