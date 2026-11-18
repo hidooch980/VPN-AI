@@ -39,6 +39,7 @@ internal class WireGuardDataPlaneProbe(context: Context) {
 
     companion object {
         internal const val EXPECTED_STATUS = 204
+        internal fun acceptsStatus(statusCode: Int): Boolean = statusCode == EXPECTED_STATUS
         private const val PROBE_URL = "https://connectivitycheck.gstatic.com/generate_204"
         private const val CONNECT_TIMEOUT_MS = 2500
         private const val READ_TIMEOUT_MS = 2500
