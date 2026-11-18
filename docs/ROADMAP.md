@@ -347,14 +347,16 @@ Every progress report must identify commit/branch, tests actually run, result, e
 
 ## 11. Current project truth
 
-At the current checkpoint:
-- The repository now contains an initial Android application shell, a WireGuard profile import flow, a serialized WireGuard backend controller, and Android CI/CodeQL workflows.
-- The WireGuard integration is in development; it has not yet passed CI or physical-device data-plane testing.
-- DNS/IPv4/IPv6 leak verification, Kill Switch validation, measured server selection, automated failover, AI learning, and secure updates remain incomplete.
-- No engine is declared production-ready.
-- No real-device field-test result is claimed by this document.
-- No signed APK or public release is claimed.
-- No production signing key is authorized by this roadmap.
-- Candidate engines and DPI-related projects remain subject to independent review.
+At the current checkpoint (branch `foundation/vpn-ai-start`):
+- The Android shell, WireGuard profile import path, signed-release workflow, and periodic GitHub Release updater are present in source. Their presence is not proof of end-to-end security or device behavior.
+- A pure Kotlin connection state machine is integrated into the serialized WireGuard controller. Backend `UP` moves the session only into `VERIFYING`; no event currently promotes it to `ONLINE` because a trustworthy end-to-end data-plane probe has not yet been implemented.
+- The UI no longer colors a backend-UP-but-unverified session as online.
+- State-machine and profile-size unit tests exist. The latest CI, CodeQL, and signed-release runs must be checked for the exact current commit before reporting a pass; commits made while workflows are running can cancel earlier CI runs.
+- The current controller has not been demonstrated on a physical Android device. Android VPN consent, real packet forwarding, DNS, IPv4/IPv6, Kill Switch/lockdown, network handoff, crash recovery, and teardown remain to be verified.
+- The release updater currently checks GitHub Release asset SHA-256 metadata over HTTPS and relies on Android's package-signature continuity at installation. A separately signed update manifest, anti-rollback enforcement, atomic engine-component updates, and verified rollback are not yet implemented.
+- DNS/IPv4/IPv6 leak verification, Kill Switch validation, measured server selection, automated failover, AI learning, and additional engines remain incomplete.
+- No engine is declared production-ready. No real-device field-test result is claimed here.
+- A successful signed-release workflow exists for an earlier commit, but the latest source changes have not yet earned a new release claim.
+- The permanent signing identity must be preserved; never regenerate or rotate it.
 
 These statements must be updated only when supported by repository commits, CI results, test artifacts, and verifiable device evidence.
