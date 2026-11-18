@@ -135,7 +135,7 @@ Support a secure update workflow for the application and separately versioned en
 
 ## 4. Engine and protocol evaluation policy
 
-Potential candidates are research inputs, not approved integrations. Evaluate one at a time and record a decision:
+Potential candidates are research inputs, not approved integrations. The user has explicitly accepted GPL-3.0 obligations for the project; this does not waive source notices, corresponding-source, attribution, or other applicable license duties. Evaluate one at a time and record a decision:
 
 - sing-box
 - Xray-core
