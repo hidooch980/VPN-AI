@@ -1,6 +1,6 @@
 # VPN AI — Architecture
 
-**Status:** Initial implementation baseline  
+**Status:** Foundation implementation in progress  
 **Platform:** Android  
 **Release target:** `v1.0.0 Stable`
 
@@ -27,7 +27,7 @@
 
 ### Session supervisor
 - Serializes connect, reconnect, failover, and disconnect.
-- Models Idle, Preparing, Connecting, Online, Degraded, Stopping, and Failed.
+- Models Idle, Preparing, Connecting, Verifying, Online, Degraded, Stopping, and Failed. `Online` is reachable only after an explicit data-plane verification event.
 - Stops forwarding before backend shutdown and releases resources in a deterministic order.
 - Uses bounded timeouts and explicit error states.
 
@@ -54,19 +54,18 @@ Every engine integration must expose identity/version, supported ABIs, profile v
 
 ## 3. WireGuard integration boundary
 
-The first engine uses the official `com.wireguard.android:tunnel` library and its userspace backend. The library-provided `GoBackend.VpnService` is the sole TUN owner for this engine. The application must request Android VPN consent before bringing a tunnel up.
+The first engine uses the official `com.wireguard.android:tunnel` library and its userspace backend. The library-provided `GoBackend.VpnService` is the sole TUN owner for this engine. The application must request Android VPN consent before bringing a tunnel up. The application controller serializes lifecycle operations on one executor and integrates the pure Kotlin connection state machine. Backend `UP` transitions only to `VERIFYING`; it is not proof of peer handshake, internet reachability, DNS correctness, or successful application data flow.
 
 A WireGuard profile must be supplied by the user or an authorized service. No server, peer key, endpoint, DNS resolver, or location is bundled or fabricated. Private profile material must not be logged or sent to analytics.
 
 ## 4. Session state model
 
 ```text
-Idle -> Preparing -> Connecting -> Online <-> Degraded
-                         |             |
-                         v             v
-                       Failed       Stopping
-                         |             |
-                         +----------> Idle
+Idle -> Preparing -> Connecting -> Verifying -> Online <-> Degraded
+           |               |             |          |
+           +---------------+-------------+----------+--> Stopping -> Idle
+           |               |             |
+           +---------------+-------------+--> Failed -> Reset -> Idle
 ```
 
 Disconnect is always permitted. Failover cannot start a replacement tunnel until the prior backend has safely stopped or a documented recovery path has taken ownership.
