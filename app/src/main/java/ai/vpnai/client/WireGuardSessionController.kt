@@ -66,8 +66,12 @@ internal object WireGuardSessionController {
                     transition(ConnectionEvent.VERIFY_DATA_PLANE)
                     verifyWireGuardTraffic(engine)
                 } else {
+                    val teardown = runCatching { ensureBackendDown() }
                     transition(ConnectionEvent.FAILURE)
-                    publish("موتور اتصال را فعال نکرد")
+                    publish(
+                        if (teardown.isSuccess) "موتور اتصال را فعال نکرد؛ خاموش بودن تونل تأیید شد"
+                        else "موتور اتصال فعال نشد و خاموش بودن تونل هنوز قابل تأیید نیست"
+                    )
                 }
             } catch (error: Exception) {
                 // setState(UP) can fail after partial native setup. Attempt teardown before
@@ -93,7 +97,7 @@ internal object WireGuardSessionController {
                 if (stateMachine.state != ConnectionState.STOPPING) {
                     transition(ConnectionEvent.STOP)
                 }
-                backend?.setState(tunnel, Tunnel.State.DOWN, null)
+                ensureBackendDown()
                 transition(ConnectionEvent.STOPPED)
                 publish("اتصال قطع شد")
             } catch (error: Exception) {
@@ -106,9 +110,19 @@ internal object WireGuardSessionController {
     /** MSN-GUARD-style verified-connect gate: backend UP is not enough. */
     private fun verifyWireGuardTraffic(engine: GoBackend) {
         publish("تونل WireGuard بالا است؛ در حال بررسی عبور واقعی داده…")
-        val baseline = runCatching { engine.getStatistics(tunnel) }.getOrNull()
-        val baselineTx = baseline?.totalTx() ?: 0L
-        val baselineRx = baseline?.totalRx() ?: 0L
+        val baseline = try {
+            engine.getStatistics(tunnel)
+        } catch (error: Exception) {
+            val teardown = runCatching { ensureBackendDown() }
+            transition(ConnectionEvent.FAILURE)
+            publish(
+                if (teardown.isSuccess) "آمار اولیه WireGuard در دسترس نیست؛ تونل خاموش شد"
+                else "آمار اولیه WireGuard در دسترس نیست و خاموش بودن تونل تأیید نشد"
+            )
+            return
+        }
+        val baselineTx = baseline.totalTx()
+        val baselineRx = baseline.totalRx()
         val deadline = SystemClock.elapsedRealtime() + DATA_PLANE_VERIFY_TIMEOUT_MS
         var verified = false
         while (SystemClock.elapsedRealtime() < deadline) {
@@ -135,9 +149,12 @@ internal object WireGuardSessionController {
             }
         }
         if (!verified) {
-            runCatching { ensureBackendDown() }
+            val teardown = runCatching { ensureBackendDown() }
             transition(ConnectionEvent.FAILURE)
-            publish("WireGuard بالا آمد اما عبور واقعی داده تأیید نشد")
+            publish(
+                if (teardown.isSuccess) "WireGuard بالا آمد اما عبور واقعی داده تأیید نشد؛ تونل خاموش شد"
+                else "عبور واقعی داده تأیید نشد و خاموش بودن تونل نیز قابل تأیید نیست؛ اتصال مجدد مسدود می‌ماند"
+            )
         }
     }
 
@@ -170,6 +187,7 @@ internal object WireGuardSessionController {
     private fun publish(status: String) {
         currentStatus = status
         connectionState = stateMachine.state
-        listeners.forEach { listener -> listener(status) }
+        // A UI observer must never interrupt VPN lifecycle work.
+        listeners.forEach { listener -> runCatching { listener(status) } }
     }
 }
