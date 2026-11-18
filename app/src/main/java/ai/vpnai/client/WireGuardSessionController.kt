@@ -64,7 +64,7 @@ internal object WireGuardSessionController {
                 if (state == Tunnel.State.UP) {
                     transition(ConnectionEvent.BACKEND_READY)
                     transition(ConnectionEvent.VERIFY_DATA_PLANE)
-                    verifyWireGuardTraffic(engine)
+                    verifyWireGuardTraffic(engine, context)
                 } else {
                     val teardown = runCatching { ensureBackendDown() }
                     transition(ConnectionEvent.FAILURE)
@@ -108,7 +108,7 @@ internal object WireGuardSessionController {
     }
 
     /** MSN-GUARD-style verified-connect gate: backend UP is not enough. */
-    private fun verifyWireGuardTraffic(engine: GoBackend) {
+    private fun verifyWireGuardTraffic(engine: GoBackend, context: Context) {
         publish("تونل WireGuard بالا است؛ در حال بررسی عبور واقعی داده…")
         val baseline = try {
             engine.getStatistics(tunnel)
@@ -141,11 +141,25 @@ internal object WireGuardSessionController {
             } catch (_: Exception) {
                 continue
             }
-            if (stats.totalTx() > baselineTx && stats.totalRx() > baselineRx) {
-                verified = true
-                transition(ConnectionEvent.DATA_PLANE_VERIFIED)
-                publish("اتصال WireGuard تأیید شد؛ عبور واقعی داده برقرار است")
-                break
+            // A controlled HTTPS request is explicitly opened on Android's active
+            // VPN Network. Counter growth alone is not accepted as end-to-end proof.
+            val probeSucceeded = WireGuardDataPlaneProbe(context).verify()
+            if (probeSucceeded) {
+                val afterProbe = try {
+                    engine.getStatistics(tunnel)
+                } catch (_: Exception) {
+                    continue
+                }
+                if (afterProbe.totalTx() > baselineTx &&
+                    afterProbe.totalRx() > baselineRx &&
+                    stats.totalTx() >= baselineTx &&
+                    stats.totalRx() >= baselineRx
+                ) {
+                    verified = true
+                    transition(ConnectionEvent.DATA_PLANE_VERIFIED)
+                    publish("اتصال WireGuard تأیید شد؛ آزمون HTTPS داخل تونل موفق بود")
+                    break
+                }
             }
         }
         if (!verified) {
