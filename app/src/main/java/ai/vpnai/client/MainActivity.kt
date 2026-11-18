@@ -159,6 +159,16 @@ class MainActivity : Activity() {
 
         root.addView(label(tr("داشبورد", "DASHBOARD"), 11f, CYAN, true))
         root.addView(space(9))
+        root.addView(label(tr("نمای سه‌بعدی توپولوژی شبکه • نمایشی", "3D NETWORK TOPOLOGY • VISUAL ONLY"), 9f, MUTED, true))
+        root.addView(NetworkGlobeView(this), LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, dp(190)
+        ))
+        root.addView(label(
+            tr("این انیمیشن تزئینی است و سرور، مسیر، پینگ یا ترافیک زنده را نشان نمی‌دهد.",
+               "Decorative visualization only; it does not represent live servers, routes, ping or traffic."),
+            9f, MUTED, false
+        ))
+        root.addView(space(10))
 
         // Main connection card.
         val hero = column().apply {
