@@ -3,7 +3,7 @@ set -Eeuo pipefail
 umask 077
 
 REPO="hidooch980/VPN-AI"
-BRANCH="foundation/vpn-ai-start"
+BRANCH="main"
 ALIAS="vpnai-release"
 WORK_DIR="$HOME/.vpn-ai-signing-bootstrap"
 KEYSTORE="$WORK_DIR/vpn-ai-release.jks"
