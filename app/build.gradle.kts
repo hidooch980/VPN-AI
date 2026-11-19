@@ -12,12 +12,13 @@ val releaseSigningReady = listOf(
     releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword
 ).all { !it.isNullOrBlank() }
 
-val releaseTaskRequested = gradle.startParameter.taskNames.any {
-    it.contains("release", ignoreCase = true)
+val releasePackagingRequested = gradle.startParameter.taskNames.any {
+    it.contains("assembleRelease", ignoreCase = true) ||
+        it.contains("bundleRelease", ignoreCase = true)
 }
-if (releaseTaskRequested && !releaseSigningReady) {
+if (releasePackagingRequested && !releaseSigningReady) {
     throw GradleException(
-        "Release signing is not configured. A persistent signing keystore is required."
+        "Stable release packaging is blocked. Configure the permanent release signing identity first."
     )
 }
 
@@ -49,7 +50,6 @@ android {
         }
     }
     buildTypes {
-        debug { applicationIdSuffix = ".debug"; versionNameSuffix = "-debug" }
         release {
             isMinifyEnabled = true
             if (releaseSigningReady) signingConfig = signingConfigs.getByName("release")
@@ -58,6 +58,13 @@ android {
     }
     testOptions { unitTests.isReturnDefaultValues = true }
 }
+
+androidComponents {
+    beforeVariants(selector().withBuildType("debug")) { variantBuilder ->
+        variantBuilder.enable = false
+    }
+}
+
 dependencies {
     implementation("com.wireguard.android:tunnel:1.0.20260102")
     implementation("androidx.core:core-ktx:1.15.0")

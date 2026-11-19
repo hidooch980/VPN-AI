@@ -1,17 +1,16 @@
-name: Android CI
+name: Stable Validation
 on:
   workflow_dispatch:
   push:
-    branches: ["main", "foundation/**"]
+    branches: ["main", "release/**"]
   pull_request:
 permissions:
   contents: read
-  actions: read
 concurrency:
-  group: android-ci-${{ github.ref }}
+  group: stable-validation-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  build-test:
+  validate:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -22,18 +21,11 @@ jobs:
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.9'
+          gradle-version: "8.9"
       - uses: android-actions/setup-android@v3
         with:
-          packages: 'platform-tools'
+          packages: "platform-tools"
       - name: Install Android SDK components
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
-      - name: Build, unit test, and lint
-        run: gradle --no-daemon :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
-      - name: Upload debug APK for physical device testing
-        uses: actions/upload-artifact@v4
-        with:
-          name: vpn-ai-debug-${{ github.sha }}
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 7
+      - name: Run stable-variant unit tests and lint
+        run: gradle --no-daemon :app:testReleaseUnitTest :app:lintRelease
