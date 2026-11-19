@@ -4,11 +4,18 @@ An independent Android-first VPN application project focused on secure, intellig
 
 ## Project status
 
-- **Development stage:** Foundation implementation with automated update delivery
+- **Product channel:** Stable Release only
 - **Target:** VPN AI v1.0.x Stable (signed)
-- **Release status:** A stable release is published only after the persistent signing identity is available and the release verification gates pass
+- **Release status:** Stable signed releases only; publication is blocked until the permanent signing identity and release verification gates pass
 - **Engine status:** No engine is yet verified on a physical device
-- **Production readiness:** Not established
+- **Production readiness:** Not yet established; physical-device and real-server acceptance tests remain mandatory
+
+
+## Stable-only build policy
+
+- The Android `debug` build variant is disabled; no Debug APK or public experimental/beta package is produced.
+- CI validates the Release variant with unit tests and lint. The only installable package is a signed Release APK published after signing-identity, signature, certificate-continuity, and checksum gates pass.
+- Automated code validation is an internal quality gate, not a separate app version or distribution channel.
 
 ## Canonical documentation
 
